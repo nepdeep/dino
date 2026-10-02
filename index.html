@@ -1,0 +1,2714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#a9e2ff" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Dino Picnic Island</title>
+<style>
+  :root {
+    --ink: #5b4a8a;
+    --shadow: rgba(80, 40, 90, 0.18);
+  }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: linear-gradient(180deg, #9fdcff 0%, #cdeeff 40%, #fff2d8 78%, #ffdce8 100%);
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  #game {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: pointer;
+  }
+
+  /* Squishy clay buttons */
+  .cbtn {
+    position: fixed;
+    z-index: 5;
+    border: 0;
+    padding: 0;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    background:
+      radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.75) 0 13%, rgba(255, 255, 255, 0) 14%),
+      var(--bg, #ffe066);
+    box-shadow:
+      inset -8px -10px 0 rgba(0, 0, 0, 0.12),
+      inset 6px 6px 14px rgba(255, 255, 255, 0.55),
+      0 9px 0 var(--shadow),
+      0 16px 30px var(--shadow);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+  }
+  .cbtn:focus-visible { box-shadow: 0 0 0 6px #fff, 0 0 0 10px var(--ink); }
+  .cbtn:active { transform: scale(0.9); }
+  .cbtn svg { width: 62%; height: 62%; pointer-events: none; }
+  .cbtn[hidden] { display: none; }
+  .pop { animation: popIn 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both, pulse 2s ease-in-out 0.6s infinite; }
+  @keyframes popIn { from { transform: scale(0); } to { transform: scale(1); } }
+  @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+  #mute {
+    --bg: #ffffff;
+    width: 68px; height: 68px;
+    top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+  }
+  #dance {
+    --bg: #ff9ecb;
+    width: 128px; height: 128px;
+    top: max(18px, env(safe-area-inset-top));
+    left: 50%;
+    margin-left: -64px;
+  }
+  #replay {
+    --bg: #8be38b;
+    width: 150px; height: 150px;
+    bottom: max(28px, env(safe-area-inset-bottom));
+    left: 50%;
+    margin-left: -75px;
+  }
+
+  #start {
+    position: fixed;
+    inset: 0;
+    z-index: 8;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.15) 70%);
+    transition: opacity 0.5s ease;
+  }
+  #start.gone { opacity: 0; pointer-events: none; }
+  #play {
+    position: relative;
+    --bg: #ffd23f;
+    width: min(46vmin, 220px);
+    height: min(46vmin, 220px);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  #hand {
+    position: fixed;
+    left: 0; top: 0;
+    width: 104px; height: 124px;
+    z-index: 9;
+    pointer-events: none;
+    opacity: 0;
+    transform-origin: 30% 6%;
+    filter: drop-shadow(0 8px 6px rgba(60, 30, 70, 0.25));
+    will-change: transform, opacity;
+  }
+  #hand svg { width: 100%; height: 100%; }
+
+  #nogl {
+    position: fixed; inset: 0; display: none; place-items: center;
+    font: 600 22px system-ui, sans-serif; color: var(--ink);
+  }
+</style>
+</head>
+<body>
+<canvas id="game" aria-label="Dino Picnic Island game"></canvas>
+
+<button id="mute" class="cbtn" aria-label="Sound on or off">
+  <svg id="icon-sound" viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M10 24h10l14-12v40L20 40H10z" fill="#5b4a8a" stroke="#5b4a8a" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M42 22c4 3 6 6 6 10s-2 7-6 10M49 14c6 5 9 11 9 18s-3 13-9 18" stroke="#5b4a8a" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </svg>
+  <svg id="icon-muted" viewBox="0 0 64 64" aria-hidden="true" style="display:none">
+    <path d="M10 24h10l14-12v40L20 40H10z" fill="#b5a9d6" stroke="#b5a9d6" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M43 24l14 16M57 24L43 40" stroke="#ff6f91" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </svg>
+</button>
+
+<button id="dance" class="cbtn" aria-label="Dance party" hidden>
+  <svg viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M24 14l26-7v8l-26 7z" fill="#5b4a8a"/>
+    <rect x="21" y="16" width="5" height="32" rx="2" fill="#5b4a8a"/>
+    <rect x="45" y="9" width="5" height="32" rx="2" fill="#5b4a8a"/>
+    <ellipse cx="17" cy="48" rx="9" ry="7" transform="rotate(-20 17 48)" fill="#5b4a8a"/>
+    <ellipse cx="41" cy="41" rx="9" ry="7" transform="rotate(-20 41 41)" fill="#5b4a8a"/>
+    <circle cx="10" cy="14" r="3" fill="#fff"/><circle cx="56" cy="52" r="3" fill="#fff"/>
+  </svg>
+</button>
+
+<button id="replay" class="cbtn" aria-label="Play again" hidden>
+  <svg viewBox="0 0 64 64" aria-hidden="true">
+    <path d="M50 20A22 22 0 1 0 54 38" stroke="#2f6b3a" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M42 8l14 2-4 14z" fill="#2f6b3a" stroke="#2f6b3a" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="32" cy="35" r="10" fill="#ff4d4d"/>
+    <path d="M32 25c0-4 2-6 4-7" stroke="#7a4b2a" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <ellipse cx="38" cy="22" rx="5" ry="2.6" transform="rotate(-25 38 22)" fill="#5cc84a"/>
+  </svg>
+</button>
+
+<div id="start">
+  <button id="play" class="cbtn" aria-label="Play">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <path d="M22 14c0-3 3-5 6-3l24 17c3 2 3 6 0 8L28 53c-3 2-6 0-6-3z" fill="#ff7a59" stroke="#e8573a" stroke-width="3" stroke-linejoin="round"/>
+    </svg>
+  </button>
+</div>
+
+<div id="hand" aria-hidden="true">
+  <svg viewBox="0 0 100 120">
+    <path d="M30 6c6 0 11 5 11 11v36l3-1c5-2 10 0 12 4l1 3c5-3 11-1 13 4l1 3c5-2 11 1 12 6l3 17c2 15-4 27-16 32-10 4-24 4-33-2-8-5-14-13-18-22L9 74c-3-6 0-12 6-13 4 0 7 2 9 5l2 3V17c0-6 4-11 4-11z"
+      fill="#fff3e4" stroke="#6b4a8a" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M45 66v14M60 68v12M75 72v10" stroke="#e6c9b5" stroke-width="4" stroke-linecap="round"/>
+  </svg>
+</div>
+
+<div id="nogl" aria-live="polite">🦕</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+/* =====================================================================
+   Small helpers
+   ===================================================================== */
+const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = (arr) => {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const damp = (a, b, lambda, dt) => lerp(a, b, 1 - Math.exp(-lambda * dt));
+const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const ease = {
+  outBack: (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+  inOut: (t) => 0.5 - 0.5 * Math.cos(Math.PI * t),
+  out: (t) => 1 - Math.pow(1 - t, 3),
+  in: (t) => t * t * t,
+};
+
+const params = new URLSearchParams(location.search);
+const MAX_DT = params.has('fast') ? 0.25 : 0.1;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const AMBIENT = REDUCED ? 0.35 : 1; // scales idle "background" motion
+
+let T = 0; // game clock (seconds)
+
+/* ---------- tweens ---------- */
+const tweens = new Set();
+function tween(dur, fn, done, delay = 0) {
+  const tw = { t: -delay, dur, fn, done };
+  tweens.add(tw);
+  return tw;
+}
+const wait = (sec, fn) => tween(sec, () => {}, fn);
+function updateTweens(dt) {
+  for (const tw of [...tweens]) {
+    tw.t += dt;
+    if (tw.t < 0) continue;
+    const k = Math.min(1, tw.t / tw.dur);
+    tw.fn(k);
+    if (k >= 1) {
+      tweens.delete(tw);
+      tw.done && tw.done();
+    }
+  }
+}
+
+/* ---------- springs (for squishy jelly motion) ---------- */
+class Spring {
+  constructor(k = 180, d = 9, x = 0) { this.k = k; this.d = d; this.x = x; this.v = 0; this.target = x; }
+  kick(v) { this.v += v; }
+  update(dt) {
+    const n = Math.max(1, Math.ceil(dt / 0.012));
+    const h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = -this.k * (this.x - this.target) - this.d * this.v;
+      this.v += a * h;
+      this.x += this.v * h;
+    }
+  }
+}
+
+/* =====================================================================
+   Renderer, scenes, camera, light
+   ===================================================================== */
+const canvas = document.getElementById('game');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+} catch (e) {
+  document.getElementById('nogl').style.display = 'grid';
+  throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.autoClear = false;
+renderer.setClearColor(0x000000, 0);
+
+const scene = new THREE.Scene();
+const overlay = new THREE.Scene(); // drawn on top: the "I want this" picture bubble
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = envTex;
+scene.environmentIntensity = 0.45;
+overlay.environment = envTex;
+overlay.environmentIntensity = 0.45;
+
+const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 200);
+
+function addLights(target, withShadow) {
+  const hemi = new THREE.HemisphereLight(0xeaf7ff, 0xf2cfa4, 1.55);
+  target.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff1de, 2.3);
+  sun.position.set(6, 12, 8);
+  if (withShadow) {
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const sc = sun.shadow.camera;
+    sc.left = -9; sc.right = 9; sc.top = 9; sc.bottom = -9; sc.near = 1; sc.far = 40;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.03;
+    sun.shadow.radius = 4;
+  }
+  target.add(sun);
+  const fill = new THREE.DirectionalLight(0xd9e8ff, 0.6);
+  fill.position.set(-8, 5, 6);
+  target.add(fill);
+}
+addLights(scene, true);
+addLights(overlay, false);
+
+/* =====================================================================
+   Procedural textures (all generated locally)
+   ===================================================================== */
+function makeCanvas(w, h = w) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return [c, c.getContext('2d')];
+}
+
+// soft lumpy "thumb-pressed clay" bump map
+const clayTex = (() => {
+  const s = 256;
+  const [c, g] = makeCanvas(s);
+  g.fillStyle = '#808080';
+  g.fillRect(0, 0, s, s);
+  const dot = (x, y, r, v, a) => {
+    for (const ox of [-s, 0, s]) for (const oy of [-s, 0, s]) {
+      const grd = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      grd.addColorStop(0, `rgba(${v},${v},${v},${a})`);
+      grd.addColorStop(1, `rgba(${v},${v},${v},0)`);
+      g.fillStyle = grd;
+      g.beginPath(); g.arc(x + ox, y + oy, r, 0, Math.PI * 2); g.fill();
+    }
+  };
+  for (let i = 0; i < 700; i++) dot(rand(0, s), rand(0, s), rand(3, 16), Math.random() < 0.5 ? 255 : 0, 0.09);
+  g.lineWidth = 1.1;
+  for (let k = 0; k < 7; k++) {
+    const cx = rand(20, s - 20), cy = rand(20, s - 20);
+    for (let r = 3; r < 22; r += 2.6) {
+      g.strokeStyle = 'rgba(0,0,0,0.05)';
+      g.beginPath(); g.arc(cx, cy, r, rand(0, 3), rand(3.5, 6)); g.stroke();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 2);
+  return t;
+})();
+
+const ginghamTex = (() => {
+  const s = 256;
+  const [c, g] = makeCanvas(s);
+  g.fillStyle = '#fffaf2';
+  g.fillRect(0, 0, s, s);
+  const n = 8, w = s / n;
+  g.fillStyle = 'rgba(255, 110, 150, 0.5)';
+  for (let i = 0; i < n; i += 2) {
+    g.fillRect(i * w, 0, w, s);
+    g.fillRect(0, i * w, s, w);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(1.6, 1);
+  return t;
+})();
+
+const weaveTex = (() => {
+  const [c, g] = makeCanvas(128, 64);
+  g.fillStyle = '#b77a3e';
+  g.fillRect(0, 0, 128, 64);
+  for (let row = 0; row < 4; row++) {
+    for (let col = 0; col < 8; col++) {
+      const x = col * 16, y = row * 16;
+      const light = (row + col) % 2 === 0;
+      g.fillStyle = light ? '#e6b06c' : '#cf9455';
+      g.beginPath();
+      g.roundRect(x + 1.5, y + 1.5, 13, 13, 5);
+      g.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(10, 2);
+  return t;
+})();
+
+const hatTexCache = new Map();
+function hatTex(color) {
+  if (hatTexCache.has(color)) return hatTexCache.get(color);
+  const [c, g] = makeCanvas(128);
+  g.fillStyle = color;
+  g.fillRect(0, 0, 128, 128);
+  g.fillStyle = 'rgba(255,255,255,0.9)';
+  for (let y = 10; y < 128; y += 26) for (let x = (y / 26) % 2 ? 14 : 0; x < 140; x += 28) {
+    g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.fill();
+  }
+  g.fillStyle = 'rgba(255,255,255,0.55)';
+  g.fillRect(0, 112, 128, 10);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  hatTexCache.set(color, t);
+  return t;
+}
+
+const starTex = (() => {
+  const s = 64;
+  const [c, g] = makeCanvas(s);
+  const grd = g.createRadialGradient(32, 32, 0, 32, 32, 30);
+  grd.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grd.addColorStop(0.25, 'rgba(255,255,255,0.35)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, s, s);
+  g.fillStyle = '#fff';
+  g.beginPath();
+  g.moveTo(32, 4); g.quadraticCurveTo(35, 29, 60, 32); g.quadraticCurveTo(35, 35, 32, 60);
+  g.quadraticCurveTo(29, 35, 4, 32); g.quadraticCurveTo(29, 29, 32, 4);
+  g.fill();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+
+/* =====================================================================
+   Clay materials and mesh helpers
+   ===================================================================== */
+const matCache = new Map();
+function clay(color, o = {}) {
+  const key = color + '|' + JSON.stringify(o);
+  if (!o.unique && matCache.has(key)) return matCache.get(key);
+  const m = new THREE.MeshStandardMaterial({
+    color,
+    roughness: o.rough ?? 0.55,
+    metalness: 0,
+    bumpMap: o.noBump ? null : clayTex,
+    bumpScale: o.bump ?? 1.4,
+    transparent: !!o.transparent,
+    opacity: o.opacity ?? 1,
+    side: o.side ?? THREE.FrontSide,
+    vertexColors: !!o.vertexColors,
+    map: o.map ?? null,
+  });
+  if (o.emissive) { m.emissive.set(o.emissive); m.emissiveIntensity = o.emissiveIntensity ?? 0.15; }
+  if (!o.unique) matCache.set(key, m);
+  return m;
+}
+
+const SPH = new THREE.SphereGeometry(1, 36, 24);
+const SPH_LO = new THREE.SphereGeometry(1, 14, 10);
+const GEO = {};
+const geo = (key, fn) => GEO[key] || (GEO[key] = fn());
+
+function blob(mat, sx, sy, sz, x = 0, y = 0, z = 0, parent = null, shadow = true, g = SPH) {
+  const m = new THREE.Mesh(g, mat);
+  m.scale.set(sx, sy, sz);
+  m.position.set(x, y, z);
+  m.castShadow = shadow;
+  m.receiveShadow = shadow;
+  if (parent) parent.add(m);
+  return m;
+}
+function mesh(geometry, mat, parent, x = 0, y = 0, z = 0, shadow = true) {
+  const m = new THREE.Mesh(geometry, mat);
+  m.position.set(x, y, z);
+  m.castShadow = shadow;
+  m.receiveShadow = shadow;
+  if (parent) parent.add(m);
+  return m;
+}
+const lathe = (pts, seg = 40) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+
+/* =====================================================================
+   Gentle synthesized sound
+   ===================================================================== */
+const Sound = (() => {
+  let ctx = null, master = null, noiseBuf = null;
+  let muted = false;
+  try { muted = localStorage.getItem('dino-picnic-muted') === '1'; } catch (e) { /* storage unavailable */ }
+
+  function init() {
+    if (ctx) { if (ctx.state !== 'running') ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    master = ctx.createGain();
+    master.gain.value = muted ? 0 : 0.7;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20;
+    comp.ratio.value = 4;
+    master.connect(comp);
+    comp.connect(ctx.destination);
+    noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+
+  function tone({ f = 440, f2, f3, dur = 0.2, type = 'sine', vol = 0.15, at = 0, attack = 0.01, lp, vib, vibDepth = 10, am, amDepth = 0.5 }) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime + at;
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f, t0);
+    if (f3) {
+      o.frequency.exponentialRampToValueAtTime(f2, t0 + dur * 0.45);
+      o.frequency.exponentialRampToValueAtTime(f3, t0 + dur);
+    } else if (f2) {
+      o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+    }
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    let node = o;
+    if (lp) {
+      const fl = ctx.createBiquadFilter();
+      fl.type = 'lowpass';
+      fl.frequency.value = lp;
+      o.connect(fl);
+      node = fl;
+    }
+    node.connect(g);
+    const extra = [];
+    if (vib) {
+      const l = ctx.createOscillator();
+      l.frequency.value = vib;
+      const lg = ctx.createGain();
+      lg.gain.value = vibDepth;
+      l.connect(lg); lg.connect(o.frequency);
+      extra.push(l);
+    }
+    if (am) {
+      const amg = ctx.createGain();
+      amg.gain.value = 1 - amDepth;
+      const l = ctx.createOscillator();
+      l.frequency.value = am;
+      const lg = ctx.createGain();
+      lg.gain.value = amDepth;
+      l.connect(lg); lg.connect(amg.gain);
+      g.connect(amg); amg.connect(master);
+      extra.push(l);
+    } else {
+      g.connect(master);
+    }
+    o.start(t0); o.stop(t0 + dur + 0.05);
+    for (const l of extra) { l.start(t0); l.stop(t0 + dur + 0.05); }
+  }
+
+  function noise({ dur = 0.2, vol = 0.12, type = 'bandpass', f = 1200, f2, q = 1, at = 0, attack = 0.005 }) {
+    if (!ctx) return;
+    const t0 = ctx.currentTime + at;
+    const s = ctx.createBufferSource();
+    s.buffer = noiseBuf;
+    const fl = ctx.createBiquadFilter();
+    fl.type = type;
+    fl.Q.value = q;
+    fl.frequency.setValueAtTime(f, t0);
+    if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    s.connect(fl); fl.connect(g); g.connect(master);
+    s.start(t0, rand(0, 0.5)); s.stop(t0 + dur + 0.05);
+  }
+
+  const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  const n2m = (n) => 12 * (parseInt(n.slice(1), 10) + 1) + NOTE[n[0]];
+
+  const sfx = {
+    pop: () => tone({ f: 500, f2: 900, dur: 0.14, vol: 0.18 }),
+    pick: () => tone({ f: 380, f2: 760, dur: 0.16, type: 'triangle', vol: 0.16 }),
+    drop: () => tone({ f: 320, f2: 170, dur: 0.16, vol: 0.14 }),
+    whoosh: () => noise({ dur: 0.28, vol: 0.06, f: 600, f2: 2200, q: 0.8 }),
+    hmm: () => { tone({ f: 420, f2: 560, dur: 0.22, type: 'triangle', vol: 0.12 }); tone({ f: 560, f2: 700, dur: 0.22, type: 'triangle', vol: 0.12, at: 0.22 }); },
+    chomp: () => { noise({ dur: 0.08, vol: 0.22, type: 'lowpass', f: 1500 }); tone({ f: 150, f2: 70, dur: 0.12, vol: 0.2 }); },
+    yum: () => [660, 880, 1175].forEach((f, i) => tone({ f, dur: 0.18, type: 'triangle', vol: 0.11, at: i * 0.09 })),
+    burp: () => { tone({ f: 115, f2: 82, dur: 0.6, type: 'sawtooth', vol: 0.12, lp: 520, vib: 24, vibDepth: 14, attack: 0.04 }); tone({ f: 700, f2: 1100, dur: 0.1, vol: 0.08, at: 0.62 }); },
+    yuck: () => { tone({ f: 96, dur: 0.5, type: 'sawtooth', vol: 0.09, lp: 900, am: 28, amDepth: 0.8, attack: 0.03 }); tone({ f: 420, f2: 260, dur: 0.3, type: 'triangle', vol: 0.07, at: 0.45 }); },
+    sniff: () => { noise({ dur: 0.07, vol: 0.06, f: 3200, q: 2 }); noise({ dur: 0.07, vol: 0.06, f: 3400, q: 2, at: 0.12 }); },
+    boing: () => tone({ f: 190, f2: 520, f3: 260, dur: 0.38, vol: 0.13, vib: 9, vibDepth: 18 }),
+    giggle: () => { for (let i = 0; i < 5; i++) tone({ f: 900 - i * 70, f2: 1150 - i * 70, dur: 0.07, vol: 0.08, at: i * 0.085, type: 'triangle' }); },
+    mmm: () => { tone({ f: 520, dur: 0.2, type: 'triangle', vol: 0.09, attack: 0.04 }); tone({ f: 400, dur: 0.26, type: 'triangle', vol: 0.09, attack: 0.04, at: 0.22 }); },
+    splash: () => { noise({ dur: 0.45, vol: 0.14, f: 2200, f2: 420, q: 0.7 }); tone({ f: 280, f2: 900, dur: 0.1, vol: 0.1, at: 0.02 }); },
+    bloop: () => tone({ f: 260, f2: 820, dur: 0.12, vol: 0.12 }),
+    sparkle: () => { const sc = [1047, 1175, 1319, 1568, 1760]; for (let i = 0; i < 5; i++) tone({ f: pick(sc), dur: 0.35, type: 'triangle', vol: 0.045, at: i * 0.1 }); },
+    rustle: () => noise({ dur: 0.5, vol: 0.07, f: 2600, f2: 1600, q: 0.6, attack: 0.08 }),
+    jelly: () => tone({ f: 150, f2: 330, f3: 140, dur: 0.45, vol: 0.14, vib: 12, vibDepth: 25 }),
+    place: () => { tone({ f: 600, f2: 1000, dur: 0.12, vol: 0.12 }); tone({ f: 1320, dur: 0.18, type: 'triangle', vol: 0.05, at: 0.1 }); },
+    tada: () => ['C5', 'E5', 'G5', 'C6'].forEach((n, i) => tone({ f: midi(n2m(n)), dur: i === 3 ? 0.6 : 0.2, type: 'triangle', vol: 0.11, at: i * 0.12 })),
+    tap: () => tone({ f: 700, f2: 950, dur: 0.08, vol: 0.08 }),
+  };
+
+  // a bouncy little picnic dance tune
+  const BPM = 112;
+  function music() {
+    if (!ctx) return;
+    const b = 60 / BPM;
+    const mel = [
+      [[0, 'E5', .5], [.5, 'G5', .5], [1, 'C6', 1], [2, 'G5', .5], [2.5, 'E5', .5], [3, 'G5', 1]],
+      [[0, 'F5', .5], [.5, 'A5', .5], [1, 'C6', 1], [2, 'A5', .5], [2.5, 'F5', .5], [3, 'A5', 1]],
+      [[0, 'G5', .5], [.5, 'B5', .5], [1, 'D6', 1], [2, 'B5', .5], [2.5, 'G5', .5], [3, 'B5', 1]],
+      [[0, 'C6', .5], [.5, 'G5', .5], [1, 'E5', .5], [1.5, 'G5', .5], [2, 'C6', 1.5]],
+      [[0, 'E5', .5], [.5, 'G5', .5], [1, 'C6', 1], [2, 'G5', .5], [2.5, 'E5', .5], [3, 'G5', 1]],
+      [[0, 'G5', .5], [.5, 'F5', .5], [1, 'E5', .5], [1.5, 'D5', .5], [2, 'C5', 1.5]],
+    ];
+    const roots = ['C3', 'F3', 'G3', 'C3', 'C3', 'G3'];
+    mel.forEach((bar, bi) => {
+      const bt = bi * 4;
+      for (const [o, n, d] of bar) tone({ f: midi(n2m(n)), dur: d * b * 0.95, type: 'triangle', vol: 0.09, at: (bt + o) * b, attack: 0.015 });
+      const r = n2m(roots[bi]);
+      for (let k = 0; k < 4; k++) {
+        tone({ f: midi(k % 2 ? r + 7 : r), dur: b * 0.5, type: 'sine', vol: 0.14, at: (bt + k) * b, attack: 0.01 });
+        tone({ f: 120, f2: 50, dur: 0.14, vol: k % 2 ? 0.0001 + 0.0 : 0.16, at: (bt + k) * b });
+        noise({ dur: 0.05, vol: 0.03, f: 7000, q: 1, at: (bt + k + 0.5) * b });
+      }
+    });
+    const end = 24 * b;
+    ['C5', 'E5', 'G5', 'C6'].forEach((n, i) => tone({ f: midi(n2m(n)), dur: 1.2, type: 'triangle', vol: 0.07, at: end + i * 0.06, attack: 0.02 }));
+    tone({ f: midi(36), dur: 1.0, vol: 0.14, at: end });
+  }
+
+  function setMuted(m) {
+    muted = m;
+    try { localStorage.setItem('dino-picnic-muted', m ? '1' : '0'); } catch (e) { /* ignore */ }
+    if (master && ctx) master.gain.setTargetAtTime(m ? 0 : 0.7, ctx.currentTime, 0.05);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!ctx) return;
+    if (document.hidden) ctx.suspend(); else ctx.resume();
+  });
+
+  return {
+    init, music, BPM, setMuted,
+    get muted() { return muted; },
+    play(name) { if (ctx && sfx[name]) sfx[name](); },
+  };
+})();
+
+/* =====================================================================
+   Particles (crumbs, hearts, petals, splashes, confetti…)
+   ===================================================================== */
+const parts = [];
+function spawn(obj, o = {}) {
+  const mats = [];
+  obj.traverse((m) => {
+    if (m.material) {
+      m.material = m.material.clone();
+      m.material.transparent = true;
+      mats.push(m.material);
+      m.castShadow = false;
+    }
+  });
+  obj.userData.base = obj.scale.clone();
+  (o.scene || scene).add(obj);
+  parts.push({
+    obj, mats,
+    vel: o.vel || V(), grav: o.grav ?? 0, drag: o.drag ?? 0,
+    life: o.life ?? 1.5, age: 0,
+    spin: o.spin || V(), sway: o.sway || 0, swayF: o.swayF || 2.5, phase: rand(0, 6),
+    ground: o.ground, popIn: o.popIn ?? 0.18, opacity: o.opacity ?? 1,
+    fadeAt: o.fadeAt ?? 0.65, update: o.update,
+  });
+}
+function updateParts(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.age += dt;
+    if (p.age >= p.life) {
+      p.obj.parent && p.obj.parent.remove(p.obj);
+      p.mats.forEach((m) => m.dispose());
+      parts.splice(i, 1);
+      continue;
+    }
+    const o = p.obj;
+    p.vel.y -= p.grav * dt;
+    if (p.drag) p.vel.multiplyScalar(Math.exp(-p.drag * dt));
+    o.position.addScaledVector(p.vel, dt);
+    if (p.sway) o.position.x += Math.sin(p.age * p.swayF + p.phase) * p.sway * dt;
+    o.rotation.x += p.spin.x * dt;
+    o.rotation.y += p.spin.y * dt;
+    o.rotation.z += p.spin.z * dt;
+    if (p.ground !== undefined && o.position.y < p.ground) {
+      o.position.y = p.ground;
+      p.vel.set(0, 0, 0);
+      p.spin.set(0, 0, 0);
+      p.sway = 0;
+    }
+    const k = p.age / p.life;
+    const s = p.popIn ? ease.outBack(Math.min(1, p.age / p.popIn)) : 1;
+    o.scale.copy(o.userData.base).multiplyScalar(Math.max(0.001, s));
+    const fade = k > p.fadeAt ? 1 - (k - p.fadeAt) / (1 - p.fadeAt) : 1;
+    for (const m of p.mats) m.opacity = p.opacity * fade;
+    if (p.update) p.update(p, dt, k);
+  }
+}
+
+// heart & music-note geometry
+const heartGeo = () => geo('heart', () => {
+  const s = new THREE.Shape();
+  s.moveTo(0, -0.5);
+  s.bezierCurveTo(-0.35, -0.2, -0.56, 0.0, -0.5, 0.22);
+  s.bezierCurveTo(-0.45, 0.5, -0.08, 0.52, 0, 0.27);
+  s.bezierCurveTo(0.08, 0.52, 0.45, 0.5, 0.5, 0.22);
+  s.bezierCurveTo(0.56, 0.0, 0.35, -0.2, 0, -0.5);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.14, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.07, bevelSegments: 4, curveSegments: 20 });
+  g.center();
+  return g;
+});
+const noteGeo = () => geo('note', () => {
+  const head = new THREE.Shape();
+  head.absellipse(0, 0, 0.2, 0.15, 0, Math.PI * 2, false, 0.4);
+  const stemS = new THREE.Shape();
+  stemS.moveTo(0.14, 0.05); stemS.lineTo(0.2, 0.05); stemS.lineTo(0.2, 0.75); stemS.lineTo(0.14, 0.75);
+  const flag = new THREE.Shape();
+  flag.moveTo(0.18, 0.75); flag.lineTo(0.42, 0.55); flag.lineTo(0.42, 0.44); flag.lineTo(0.18, 0.6);
+  const g = new THREE.ExtrudeGeometry([head, stemS, flag], { depth: 0.06, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.025, bevelSegments: 2 });
+  g.center();
+  return g;
+});
+
+const PASTELS = ['#ff6fa8', '#ff9ec7', '#c48bff', '#7ad7ff', '#ffd23f', '#8be38b', '#ffa65c'];
+
+function burstHearts(pos, n = 5, size = 0.32) {
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(heartGeo(), clay(pick(PASTELS), { rough: 0.4 }));
+    m.position.copy(pos).add(V(rand(-0.15, 0.15), rand(0, 0.15), rand(0, 0.2)));
+    m.scale.setScalar(size * rand(0.75, 1.15));
+    m.rotation.z = rand(-0.3, 0.3);
+    spawn(m, {
+      vel: V(rand(-0.6, 0.6), rand(1.1, 1.8), rand(0.1, 0.5)),
+      drag: 0.9, life: rand(2.0, 2.6), sway: 0.5, popIn: 0.35,
+      spin: V(0, rand(-1, 1), 0),
+    });
+  }
+}
+function crumbs(pos, color, n = 7) {
+  const mat = clay(color);
+  for (let i = 0; i < n; i++) {
+    const m = blob(mat, 0.07, 0.06, 0.07, 0, 0, 0, null, false, SPH_LO);
+    m.position.copy(pos);
+    spawn(m, { vel: V(rand(-1.4, 1.4), rand(0.6, 2.2), rand(0.2, 1.4)), grav: 9, life: 1.1, ground: 0.05, popIn: 0.05 });
+  }
+}
+function ring(pos, color = '#ffffff', size = 1, life = 1.0) {
+  const m = new THREE.Mesh(geo('ring', () => new THREE.TorusGeometry(1, 0.05, 8, 48)), clay(color, { rough: 0.3 }));
+  m.rotation.x = Math.PI / 2;
+  m.position.copy(pos);
+  m.scale.setScalar(0.15 * size);
+  spawn(m, {
+    life, popIn: 0, opacity: 0.8, fadeAt: 0.2,
+    update: (p, dt, k) => { p.obj.scale.setScalar((0.15 + 0.85 * ease.out(k)) * size); },
+  });
+}
+function puff(pos, n = 6, color = '#ffffff') {
+  for (let i = 0; i < n; i++) {
+    const m = blob(clay(color), 0.12, 0.12, 0.12, 0, 0, 0, null, false, SPH_LO);
+    m.position.copy(pos);
+    const a = (i / n) * Math.PI * 2;
+    spawn(m, { vel: V(Math.cos(a) * 1.4, rand(0.4, 1.2), Math.sin(a) * 1.4), drag: 3, life: 0.8, popIn: 0.12, opacity: 0.9 });
+  }
+}
+
+/* =====================================================================
+   Island + scenery
+   ===================================================================== */
+const tapTargets = []; // objects with userData.onTap (raycast targets)
+const world = new THREE.Group();
+scene.add(world);
+
+function buildIsland() {
+  const g = new THREE.Group();
+  world.add(g);
+  // grassy top (profile listed bottom→top so normals face out)
+  const top = mesh(lathe([[6.0, -0.66], [6.28, -0.6], [6.48, -0.43], [6.5, -0.22], [6.3, -0.05], [5.9, 0], [3, 0], [0, 0]], 96), clay('#8fdc6a', { bump: 2 }), g);
+  top.castShadow = false;
+
+  // lumpy earthy underside with soft clay strata
+  const under = lathe([[0, -8.6], [0.7, -8.2], [1.7, -6.9], [2.8, -5.4], [3.9, -3.9], [4.9, -2.5], [5.6, -1.5], [6.0, -0.95], [6.15, -0.58]], 72);
+  const pos = under.attributes.position;
+  const col = [];
+  const cA = new THREE.Color('#c98d5a'), cB = new THREE.Color('#a8683f'), cC = new THREE.Color('#e0a875'), cD = new THREE.Color('#8e5634');
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const a = Math.atan2(x, z);
+    const k = 1 + 0.07 * Math.sin(a * 5 + y * 1.3) + 0.045 * Math.sin(a * 11 - y * 1.9);
+    if (y < -0.7) { pos.setX(i, x * k); pos.setZ(i, z * k); }
+    const yy = y + 0.25 * Math.sin(a * 3);
+    const c = yy > -1.9 ? cA : yy > -3.6 ? cB : yy > -5.6 ? cC : cD;
+    col.push(c.r, c.g, c.b);
+  }
+  under.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  under.computeVertexNormals();
+  const um = mesh(under, clay('#ffffff', { vertexColors: true, bump: 2.5 }), g);
+  um.castShadow = false;
+
+  // drippy grass lip
+  const lip = clay('#7fd05c');
+  for (let i = 0; i < 34; i++) {
+    const a = (i / 34) * Math.PI * 2 + rand(-0.04, 0.04);
+    const r = 6.32;
+    blob(lip, rand(0.35, 0.5), rand(0.28, 0.42), rand(0.35, 0.5), Math.sin(a) * r, -0.55 - rand(0, 0.12), Math.cos(a) * r, g, false, SPH_LO);
+  }
+  // hanging pebbles under the island
+  const hang = [clay('#b9a7d9', { rough: 0.3 }), clay('#9fd4e8', { rough: 0.3 }), clay('#e8c27a')];
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + rand(-0.3, 0.3), r = rand(2.2, 3.6);
+    blob(pick(hang), rand(0.25, 0.45), rand(0.35, 0.6), rand(0.25, 0.45), Math.sin(a) * r, -5.6 + (r - 2.2) * 1.2 - 0.4, Math.cos(a) * r, g, false);
+  }
+
+  // tiny decorations: tufts, flowers, mushrooms
+  const grassM = clay('#5fbf4a');
+  const tuft = (x, z, s = 1) => {
+    for (let k = 0; k < 3; k++) {
+      const c = mesh(geo('tuft', () => new THREE.ConeGeometry(0.09, 0.4, 7)), grassM, g, x + (k - 1) * 0.1 * s, 0.17 * s, z + rand(-0.05, 0.05));
+      c.scale.setScalar(s * rand(0.8, 1.2));
+      c.rotation.z = (k - 1) * 0.35;
+    }
+  };
+  const flower = (x, z, color) => {
+    mesh(geo('fstem', () => new THREE.CylinderGeometry(0.025, 0.03, 0.34, 6)), grassM, g, x, 0.17, z);
+    const h = new THREE.Group(); h.position.set(x, 0.36, z); g.add(h);
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2;
+      blob(clay(color), 0.07, 0.04, 0.07, Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08, h, true, SPH_LO);
+    }
+    blob(clay('#ffd23f'), 0.05, 0.05, 0.05, 0, 0.02, 0, h, true, SPH_LO);
+  };
+  const shroom = (x, z, s = 1) => {
+    const m = new THREE.Group(); m.position.set(x, 0, z); m.scale.setScalar(s); g.add(m);
+    blob(clay('#fff1dc'), 0.11, 0.2, 0.11, 0, 0.18, 0, m);
+    blob(clay('#ff6b6b'), 0.25, 0.15, 0.25, 0, 0.36, 0, m);
+    for (let k = 0; k < 4; k++) {
+      const a = k * 1.6;
+      blob(clay('#ffffff'), 0.04, 0.025, 0.04, Math.cos(a) * 0.13, 0.46, Math.sin(a) * 0.13, m, false, SPH_LO);
+    }
+  };
+  [[-5.5, -0.8], [-2.8, -3.7], [0.9, -3.9], [3.2, -3.4], [5.6, -0.2], [-1.6, 4.9], [1.9, 5.1], [-5.6, 0.6], [5.7, 0.9]].forEach(([x, z]) => tuft(x, z, rand(0.8, 1.2)));
+  [[-5.3, -1.6, '#ffffff'], [-3.3, -4.4, '#ff9ec7'], [2.2, -4.6, '#ffd23f'], [5.2, -2.6, '#c48bff'], [-2.6, 5.2, '#ff9ec7'], [3.0, 5.0, '#ffffff'], [-0.6, -4.9, '#7ad7ff']].forEach(([x, z, c]) => flower(x, z, c));
+  shroom(-5.6, -2.3, 1.1); shroom(-5.15, -2.75, 0.75); shroom(4.0, -4.1, 0.9);
+}
+buildIsland();
+
+/* ---------- palm trees (squishy, with blossoms) ---------- */
+const trees = [];
+function makePalm(x, z, s, lean) {
+  const root = new THREE.Group();
+  root.position.set(x, 0, z);
+  root.scale.setScalar(s);
+  world.add(root);
+  const sway = new THREE.Group();
+  root.add(sway);
+  const tA = clay('#c98b52'), tB = clay('#b47440');
+  const n = 8;
+  let top = V();
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const px = lean * t * t * 1.3, py = 0.22 + i * 0.47;
+    const m = blob(i % 2 ? tA : tB, 0.33 - 0.07 * t, 0.29, 0.33 - 0.07 * t, px, py, 0, sway);
+    m.rotation.z = -lean * t * 0.9;
+    top.set(px, py + 0.2, 0);
+  }
+  const canopy = new THREE.Group();
+  canopy.position.copy(top);
+  sway.add(canopy);
+  const lA = clay('#4fc25a'), lB = clay('#6fd86a'), blossom = clay('#ffb3d1'), blossomC = clay('#fff1a8');
+  for (let k = 0; k < 7; k++) {
+    const leaf = new THREE.Group();
+    leaf.rotation.y = (k / 7) * Math.PI * 2 + 0.3;
+    canopy.add(leaf);
+    const a = blob(k % 2 ? lA : lB, 0.3, 0.075, 0.72, 0, 0.0, 0.62, leaf); a.rotation.x = 0.35;
+    const b = blob(k % 2 ? lB : lA, 0.25, 0.065, 0.55, 0, -0.33, 1.25, leaf); b.rotation.x = 0.75;
+    const c = blob(k % 2 ? lA : lB, 0.17, 0.055, 0.34, 0, -0.62, 1.62, leaf); c.rotation.x = 1.05;
+    if (k % 2 === 0) {
+      const bl = new THREE.Group(); bl.position.set(0, 0.12, 0.85); leaf.add(bl);
+      for (let p = 0; p < 5; p++) {
+        const an = (p / 5) * Math.PI * 2;
+        blob(blossom, 0.09, 0.05, 0.09, Math.cos(an) * 0.1, 0, Math.sin(an) * 0.1, bl, false, SPH_LO);
+      }
+      blob(blossomC, 0.06, 0.06, 0.06, 0, 0.03, 0, bl, false, SPH_LO);
+    }
+  }
+  const coco = clay('#8a5a33');
+  for (let k = 0; k < 3; k++) {
+    const a = k * 2.1;
+    blob(coco, 0.17, 0.17, 0.17, Math.cos(a) * 0.2, -0.22, Math.sin(a) * 0.2, canopy);
+  }
+  const tree = { root, sway, canopy, spring: new Spring(90, 5), squish: new Spring(160, 7), phase: rand(0, 6), lean };
+  root.userData.onTap = () => tapTree(tree);
+  tapTargets.push(root);
+  trees.push(tree);
+  return tree;
+}
+makePalm(-4.5, -2.3, 1.08, 0.5);
+makePalm(4.6, -2.0, 1.0, -0.55);
+makePalm(1.9, -4.4, 0.78, -0.2);
+makePalm(-2.2, -4.3, 0.7, 0.25);
+
+function tapTree(tree) {
+  tree.spring.kick(rand(0.9, 1.3) * (Math.random() < 0.5 ? -1 : 1));
+  tree.squish.kick(3.5);
+  Sound.play('rustle');
+  Sound.play('sparkle');
+  const cols = ['#ffb3d1', '#ffd6e6', '#ffffff', '#ff9ec7'];
+  for (let i = 0; i < 16; i++) {
+    const m = blob(clay(pick(cols)), 0.1, 0.022, 0.075, 0, 0, 0, null, false, SPH_LO);
+    const local = V(rand(-1.4, 1.4), rand(-0.6, 0.1), rand(-1.4, 1.4));
+    tree.canopy.localToWorld(m.position.copy(local));
+    m.rotation.set(rand(0, 3), rand(0, 3), rand(0, 3));
+    spawn(m, {
+      vel: V(rand(-0.4, 0.4), rand(0, 0.5), rand(-0.2, 0.5)),
+      grav: 1.1, drag: 1.3, sway: 1.0, swayF: rand(2, 3.5),
+      spin: V(rand(-3, 3), rand(-2, 2), rand(-3, 3)),
+      life: rand(5, 6.5), ground: 0.03, popIn: 0.2, fadeAt: 0.75,
+    });
+  }
+}
+
+/* ---------- jelly rocks ---------- */
+const rocks = [];
+function makeJellyRock(x, z, s, color) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  world.add(g);
+  const inner = new THREE.Group();
+  g.add(inner);
+  const ig = new THREE.IcosahedronGeometry(1, 4);
+  const p = ig.attributes.position;
+  const ph = rand(0, 6);
+  for (let i = 0; i < p.count; i++) {
+    const v = V(p.getX(i), p.getY(i), p.getZ(i));
+    const k = 1 + 0.07 * Math.sin(v.x * 3 + ph) * Math.cos(v.z * 2.6 + ph) + 0.04 * Math.sin(v.y * 4 + ph);
+    v.multiplyScalar(k);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  ig.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.12, metalness: 0, transparent: true, opacity: 0.86, emissive: color, emissiveIntensity: 0.14 });
+  const body = mesh(ig, mat, inner, 0, 0.62, 0);
+  body.scale.set(1, 0.68, 0.95);
+  blob(clay('#ffffff', { rough: 0.1, transparent: true, opacity: 0.6, noBump: true }), 0.22, 0.1, 0.16, -0.32, 1.0, 0.45, inner, false);
+  // sleepy little face
+  const eyeM = clay('#3a2a4a', { rough: 0.3 });
+  blob(eyeM, 0.06, 0.08, 0.04, -0.2, 0.68, 0.9, inner, false, SPH_LO);
+  blob(eyeM, 0.06, 0.08, 0.04, 0.2, 0.68, 0.9, inner, false, SPH_LO);
+  const smile = new THREE.Mesh(geo('rsmile', () => new THREE.TorusGeometry(0.09, 0.022, 6, 16, Math.PI)), eyeM);
+  smile.rotation.z = Math.PI;
+  smile.position.set(0, 0.56, 0.92);
+  inner.add(smile);
+  inner.scale.setScalar(s);
+  const rock = { g, inner, s, spring: new Spring(140, 4.5), phase: rand(0, 6) };
+  g.userData.onTap = () => {
+    rock.spring.kick(5.5);
+    Sound.play('jelly');
+    ring(V(x, 0.05, z), color, 1.2 * s, 0.9);
+  };
+  tapTargets.push(g);
+  rocks.push(rock);
+}
+makeJellyRock(4.45, 2.4, 0.78, '#7ee0c3');
+makeJellyRock(5.25, 1.15, 0.55, '#c9a7ff');
+makeJellyRock(5.1, 3.45, 0.48, '#ffb38a');
+
+/* ---------- sparkling pond + jumping fish ---------- */
+const pond = (() => {
+  const g = new THREE.Group();
+  const P = V(-4.15, 0, 2.3);
+  g.position.copy(P);
+  world.add(g);
+  const R = 1.35;
+  blob(clay('#3c8fc9'), R + 0.05, 0.12, R + 0.05, 0, -0.04, 0, g, false);
+  const water = new THREE.Mesh(
+    new THREE.CylinderGeometry(R, R, 0.06, 56),
+    new THREE.MeshStandardMaterial({ color: '#5cccff', roughness: 0.08, metalness: 0.05, emissive: '#2384c4', emissiveIntensity: 0.18, transparent: true, opacity: 0.94 })
+  );
+  water.position.y = 0.04;
+  water.receiveShadow = true;
+  g.add(water);
+  const peb = [clay('#e9dcc9'), clay('#cfc4d8'), clay('#f2d3b0'), clay('#bfe0d0')];
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    const s = rand(0.14, 0.22);
+    blob(pick(peb), s * 1.2, s * 0.8, s * 1.2, Math.cos(a) * (R + 0.08), 0.06, Math.sin(a) * (R + 0.08), g, true, SPH_LO);
+  }
+  // lily pads
+  const pad = clay('#56c464');
+  const padGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.04, 28, 1, false, 0.3, Math.PI * 1.8);
+  mesh(padGeo, pad, g, 0.55, 0.09, -0.45);
+  const pad2 = mesh(padGeo, pad, g, -0.6, 0.09, 0.3); pad2.rotation.y = 2; pad2.scale.setScalar(0.75);
+  const lf = new THREE.Group(); lf.position.set(0.55, 0.14, -0.45); g.add(lf);
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    const pm = blob(clay('#ffc2dc'), 0.06, 0.05, 0.11, Math.cos(a) * 0.07, 0.03, Math.sin(a) * 0.07, lf, false, SPH_LO);
+    pm.rotation.y = -a + Math.PI / 2; pm.rotation.x = 0.4;
+  }
+  blob(clay('#ffe066'), 0.04, 0.04, 0.04, 0, 0.06, 0, lf, false, SPH_LO);
+
+  // slow, soft twinkles (no flashing)
+  const sparkles = [];
+  for (let i = 0; i < 7; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: starTex, transparent: true, opacity: 0, depthWrite: false }));
+    const a = rand(0, Math.PI * 2), r = rand(0.2, R - 0.25);
+    sp.position.set(Math.cos(a) * r, 0.14, Math.sin(a) * r);
+    sp.scale.setScalar(rand(0.22, 0.34));
+    sp.userData.ph = rand(0, 6); sp.userData.sp = rand(1.4, 2.2);
+    g.add(sp);
+    sparkles.push(sp);
+  }
+
+  // fish
+  const makeFish = (body, fin) => {
+    const f = new THREE.Group();
+    const b = clay(body), fm = clay(fin);
+    blob(b, 0.16, 0.15, 0.27, 0, 0, 0, f);
+    const tail = new THREE.Group(); tail.position.z = -0.25; f.add(tail);
+    const t1 = blob(fm, 0.03, 0.13, 0.11, 0, 0.07, -0.06, tail); t1.rotation.x = -0.6;
+    const t2 = blob(fm, 0.03, 0.13, 0.11, 0, -0.07, -0.06, tail); t2.rotation.x = 0.6;
+    const df = blob(fm, 0.025, 0.08, 0.12, 0, 0.14, -0.02, f); df.rotation.x = -0.3;
+    for (const s of [-1, 1]) {
+      blob(clay('#ffffff', { rough: 0.3 }), 0.05, 0.055, 0.04, s * 0.11, 0.04, 0.16, f, false, SPH_LO);
+      blob(clay('#2a2233', { rough: 0.3 }), 0.028, 0.032, 0.025, s * 0.135, 0.045, 0.175, f, false, SPH_LO);
+    }
+    blob(clay('#ff7a9a'), 0.05, 0.035, 0.03, 0, -0.02, 0.27, f, false, SPH_LO);
+    f.visible = false;
+    f.userData.tail = tail;
+    g.add(f);
+    return f;
+  };
+  const fishes = [makeFish('#ff9f43', '#ffd23f'), makeFish('#ff7aa8', '#c48bff')];
+  let fishIdx = 0;
+  const busy = new Set();
+
+  function jump() {
+    const f = fishes[fishIdx];
+    if (busy.has(f)) { Sound.play('bloop'); ring(P.clone().add(V(rand(-0.5, 0.5), 0.1, rand(-0.5, 0.5))), '#ffffff', 0.6); return; }
+    fishIdx = (fishIdx + 1) % fishes.length;
+    busy.add(f);
+    const a = rand(0, Math.PI * 2);
+    const p0 = V(Math.cos(a) * 0.75, 0.05, Math.sin(a) * 0.75);
+    const p1 = V(-p0.x * rand(0.6, 0.9), 0.05, -p0.z * rand(0.6, 0.9));
+    f.visible = true;
+    f.rotation.y = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+    Sound.play('splash');
+    ring(g.localToWorld(p0.clone()).setY(0.1), '#ffffff', 0.7);
+    const dur = 1.15, H = 1.7;
+    tween(dur, (k) => {
+      f.position.lerpVectors(p0, p1, k);
+      f.position.y = 0.05 + 4 * H * k * (1 - k);
+      const vy = 4 * H * (1 - 2 * k), vh = p0.distanceTo(p1);
+      f.rotation.x = -Math.atan2(vy, vh) * 0.9;
+      f.userData.tail.rotation.y = Math.sin(k * 40) * 0.5;
+      f.scale.setScalar(Math.min(1, k * 8, (1 - k) * 8) * 1.1);
+    }, () => {
+      f.visible = false;
+      busy.delete(f);
+      Sound.play('bloop');
+      const w = g.localToWorld(p1.clone()).setY(0.1);
+      ring(w, '#ffffff', 0.8);
+      for (let i = 0; i < 6; i++) {
+        const d = blob(clay('#bdeaff'), 0.06, 0.06, 0.06, 0, 0, 0, null, false, SPH_LO);
+        d.position.copy(w);
+        spawn(d, { vel: V(rand(-1, 1), rand(1.5, 2.5), rand(-1, 1)), grav: 9, life: 0.7, popIn: 0.05 });
+      }
+    });
+  }
+  water.userData.onTap = jump;
+  tapTargets.push(water);
+
+  let rippleT = 2;
+  return {
+    P, R, jump,
+    update(dt) {
+      for (const sp of sparkles) {
+        const v = 0.5 + 0.5 * Math.sin(T * sp.userData.sp + sp.userData.ph);
+        sp.material.opacity = 0.75 * v * v;
+      }
+      lf.rotation.y += dt * 0.15 * AMBIENT;
+      rippleT -= dt;
+      if (rippleT < 0) {
+        rippleT = rand(2.5, 4.5);
+        const a = rand(0, Math.PI * 2), r = rand(0, R - 0.5);
+        ring(P.clone().add(V(Math.cos(a) * r, 0.09, Math.sin(a) * r)), '#e6f7ff', 0.45, 1.6);
+      }
+    },
+  };
+})();
+
+/* ---------- drifting clay clouds ---------- */
+const clouds = [];
+function makeCloud(x, y, z, s) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  g.scale.setScalar(s);
+  scene.add(g);
+  const m = clay('#ffffff', { rough: 0.8 });
+  const parts = [[0, 0, 0, 1], [0.9, -0.1, 0.1, 0.75], [-0.9, -0.15, 0, 0.7], [0.4, 0.45, -0.1, 0.65], [-0.4, 0.35, 0.1, 0.6]];
+  for (const [px, py, pz, r] of parts) blob(m, r, r * 0.8, r * 0.8, px, py, pz, g, false);
+  clouds.push({ g, x, ph: rand(0, 6), sp: rand(0.08, 0.15) });
+}
+makeCloud(-10, 4.5, -7, 1.2);
+makeCloud(9.5, 6, -9, 1.5);
+makeCloud(-12, -1.5, -2, 1.1);
+makeCloud(11.5, -2.5, -1, 1.3);
+makeCloud(-6, -6.5, 1, 1.0);
+makeCloud(6.5, -7, 0.5, 1.1);
+makeCloud(0, 8.5, -14, 1.8);
+
+/* ---------- picnic blanket ---------- */
+const BLANKET = { x: 0, z: 1.0, w: 4.6, d: 2.8, top: 0.085 };
+(() => {
+  const b = mesh(new RoundedBoxGeometry(BLANKET.w, 0.08, BLANKET.d, 3, 0.04), clay('#ffffff', { map: ginghamTex, bump: 1.6, rough: 0.8 }), world, BLANKET.x, 0.045, BLANKET.z);
+  b.castShadow = false;
+  b.rotation.y = 0.02;
+})();
+
+/* ---------- basket ---------- */
+const BASKET = V(0, 0, 4.0);
+(() => {
+  const g = new THREE.Group();
+  g.position.copy(BASKET);
+  g.scale.set(2.5, 0.95, 1.0);
+  world.add(g);
+  const bm = clay('#ffffff', { map: weaveTex, bump: 2, side: THREE.DoubleSide, rough: 0.75 });
+  mesh(lathe([[0, 0.02], [0.9, 0.02], [1.08, 0.12], [1.2, 0.38], [1.28, 0.62]], 64), bm, g);
+  const rim = mesh(geo('brim', () => new THREE.TorusGeometry(1.28, 0.09, 12, 64)), clay('#c98a4a'), g, 0, 0.64, 0);
+  rim.rotation.x = Math.PI / 2;
+  const band = mesh(geo('bband', () => new THREE.TorusGeometry(1.2, 0.05, 10, 64)), clay('#e6b06c'), g, 0, 0.36, 0);
+  band.rotation.x = Math.PI / 2;
+  band.scale.set(1.0, 1.0, 1.0);
+  blob(clay('#ffe7a6', { rough: 0.85, bump: 3 }), 1.18, 0.14, 1.18, 0, 0.48, 0, g, true);
+})();
+
+/* =====================================================================
+   Fruit models (oversized, chunky clay)
+   ===================================================================== */
+const leafMat = () => clay('#5cc84a');
+function leaf(parent, x, y, z, rz = 0.5, ry = 0, s = 1) {
+  const m = blob(leafMat(), 0.2 * s, 0.045 * s, 0.1 * s, x, y, z, parent);
+  m.rotation.set(0, ry, rz);
+  return m;
+}
+function stem(parent, x, y, z, h = 0.18, rz = 0.15) {
+  const m = mesh(geo('stem', () => new THREE.CylinderGeometry(0.035, 0.045, 1, 8)), clay('#7a4b2a'), parent, x, y, z);
+  m.scale.y = h;
+  m.rotation.z = rz;
+  return m;
+}
+function makeApple() {
+  const g = new THREE.Group();
+  const r = clay('#ff4d4d');
+  blob(r, 0.5, 0.46, 0.5, 0, 0, 0, g);
+  blob(r, 0.22, 0.2, 0.22, -0.16, -0.3, 0.05, g);
+  blob(r, 0.22, 0.2, 0.22, 0.16, -0.3, 0.05, g);
+  stem(g, 0.02, 0.5, 0, 0.22, 0.2);
+  leaf(g, 0.17, 0.53, 0.02, 0.5);
+  return g;
+}
+function makeBanana() {
+  const g = new THREE.Group();
+  const inner = new THREE.Group(); inner.position.y = 0.1; inner.rotation.z = -0.2; g.add(inner);
+  const y = clay('#ffd83b');
+  const n = 12;
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const a = lerp(-1.15, 1.15, t);
+    const r = 0.21 * (1 - 0.55 * Math.pow(Math.abs(a) / 1.15, 2));
+    blob(y, r, r, r * 1.05, Math.sin(a) * 0.56, -Math.cos(a) * 0.56 + 0.26, 0, inner);
+  }
+  const tip = clay('#6b4a2b');
+  blob(tip, 0.05, 0.05, 0.05, Math.sin(-1.22) * 0.56, -Math.cos(1.22) * 0.56 + 0.26, 0, inner);
+  const st = mesh(geo('bstem', () => new THREE.CylinderGeometry(0.05, 0.07, 0.2, 8)), clay('#9a8a3a'), inner, Math.sin(1.25) * 0.58, -Math.cos(1.25) * 0.58 + 0.33, 0);
+  st.rotation.z = -0.6;
+  return g;
+}
+function makeStrawberry() {
+  const g = new THREE.Group();
+  const prof = [[0, -0.5], [0.14, -0.46], [0.3, -0.3], [0.42, -0.06], [0.46, 0.14], [0.39, 0.3], [0.2, 0.38], [0, 0.4]];
+  mesh(geo('straw', () => lathe(prof, 36)), clay('#ff3b5c'), g);
+  const seed = clay('#ffe48a', { rough: 0.4 });
+  const at = (y) => {
+    for (let i = 0; i < prof.length - 1; i++) {
+      const [r0, y0] = prof[i], [r1, y1] = prof[i + 1];
+      if (y >= y0 && y <= y1) return lerp(r0, r1, (y - y0) / (y1 - y0));
+    }
+    return 0;
+  };
+  for (let i = 0; i < 30; i++) {
+    const y = lerp(-0.36, 0.26, (i * 0.618) % 1);
+    const a = i * 2.39996;
+    const r = at(y) + 0.005;
+    const s = blob(seed, 0.028, 0.04, 0.02, Math.sin(a) * r, y, Math.cos(a) * r, g, false, SPH_LO);
+    s.lookAt(V(Math.sin(a) * 2, y, Math.cos(a) * 2));
+  }
+  const top = new THREE.Group(); top.position.y = 0.38; g.add(top);
+  for (let k = 0; k < 6; k++) {
+    const l = new THREE.Group(); l.rotation.y = (k / 6) * Math.PI * 2; top.add(l);
+    const m = blob(leafMat(), 0.08, 0.03, 0.2, 0, 0, 0.14, l); m.rotation.x = 0.35;
+  }
+  stem(g, 0, 0.47, 0, 0.16, 0.1);
+  return g;
+}
+function makeWatermelon() {
+  const g = new THREE.Group();
+  const inner = new THREE.Group(); inner.position.y = 0.22; g.add(inner);
+  const red = geo('wm-red', () => {
+    const s = new THREE.Shape();
+    s.absarc(0, 0, 0.5, Math.PI, Math.PI * 2, false);
+    s.lineTo(-0.5, 0);
+    const e = new THREE.ExtrudeGeometry(s, { depth: 0.2, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.03, bevelSegments: 3, curveSegments: 28 });
+    e.translate(0, 0, -0.1);
+    return e;
+  });
+  const rindG = (k, r0, r1, d) => geo(k, () => {
+    const s = new THREE.Shape();
+    s.absarc(0, 0, r1, Math.PI, Math.PI * 2, false);
+    s.absarc(0, 0, r0, Math.PI * 2, Math.PI, true);
+    const e = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 2, curveSegments: 28 });
+    e.translate(0, 0, -d / 2);
+    return e;
+  });
+  mesh(red, clay('#ff5a6e'), inner);
+  mesh(rindG('wm-w', 0.49, 0.56, 0.22), clay('#eaffd0'), inner);
+  mesh(rindG('wm-g', 0.55, 0.64, 0.24), clay('#3fae4a'), inner);
+  const seed = clay('#3a2a2a', { rough: 0.3 });
+  const sp = [[-0.22, -0.12], [0, -0.2], [0.22, -0.12], [-0.12, -0.3], [0.12, -0.3]];
+  for (const z of [0.15, -0.15]) for (const [x, y] of sp) {
+    const s = blob(seed, 0.03, 0.05, 0.02, x, y, z, inner, false, SPH_LO);
+    s.rotation.z = x * 1.5;
+  }
+  return g;
+}
+function makeGrapes() {
+  const g = new THREE.Group();
+  const p = [clay('#8f5bd6'), clay('#a06ee6')];
+  const pts = [[-0.24, 0.24, 0.05], [0, 0.27, 0.1], [0.24, 0.24, 0.05], [-0.12, 0.05, 0.16], [0.12, 0.05, 0.16], [-0.3, 0.06, -0.05], [0.3, 0.06, -0.05],
+    [0, -0.14, 0.15], [-0.18, -0.14, 0.02], [0.18, -0.14, 0.02], [-0.08, -0.32, 0.08], [0.1, -0.32, 0.06], [0, -0.48, 0.04], [0, 0.12, -0.14], [0, 0.32, -0.1]];
+  pts.forEach(([x, y, z], i) => blob(p[i % 2], 0.155, 0.155, 0.155, x, y, z, g));
+  stem(g, 0, 0.5, 0, 0.22, 0.1);
+  leaf(g, 0.2, 0.5, 0, 0.35, 0, 1.4);
+  return g;
+}
+function makeOrange() {
+  const g = new THREE.Group();
+  blob(clay('#ffa024', { bump: 5 }), 0.48, 0.46, 0.48, 0, 0, 0, g);
+  blob(clay('#d9781a'), 0.05, 0.03, 0.05, 0, 0.46, 0, g, false, SPH_LO);
+  stem(g, 0, 0.5, 0, 0.1, 0);
+  leaf(g, 0.18, 0.52, 0, 0.35, 0, 1.2);
+  return g;
+}
+function makePear() {
+  const g = new THREE.Group();
+  mesh(geo('pear', () => lathe([[0, -0.48], [0.28, -0.45], [0.42, -0.3], [0.43, -0.1], [0.32, 0.08], [0.23, 0.22], [0.19, 0.34], [0.1, 0.44], [0, 0.46]], 36)), clay('#b6e04a'), g);
+  stem(g, 0.02, 0.52, 0, 0.18, 0.25);
+  leaf(g, 0.17, 0.52, 0, 0.5);
+  return g;
+}
+function makeCherries() {
+  const g = new THREE.Group();
+  const r = clay('#e8193c', { rough: 0.35 });
+  blob(r, 0.24, 0.23, 0.24, -0.22, -0.22, 0.05, g);
+  blob(r, 0.24, 0.23, 0.24, 0.2, -0.26, -0.02, g);
+  const sm = clay('#6b8a2a');
+  for (const [x, y] of [[-0.22, -0.02], [0.2, -0.06]]) {
+    const c = new THREE.QuadraticBezierCurve3(V(x, y, 0), V(x * 0.4, 0.25, 0), V(0.02, 0.42, 0));
+    mesh(new THREE.TubeGeometry(c, 12, 0.03, 6), sm, g);
+  }
+  leaf(g, 0.16, 0.44, 0, 0.3, 0, 1.2);
+  return g;
+}
+
+const FRUITS = [
+  { id: 'apple', color: '#ff4d4d', build: makeApple },
+  { id: 'banana', color: '#ffd83b', build: makeBanana },
+  { id: 'strawberry', color: '#ff3b5c', build: makeStrawberry },
+  { id: 'watermelon', color: '#ff5a6e', build: makeWatermelon },
+  { id: 'grapes', color: '#8f5bd6', build: makeGrapes },
+  { id: 'orange', color: '#ffa024', build: makeOrange },
+  { id: 'pear', color: '#b6e04a', build: makePear },
+  { id: 'cherries', color: '#e8193c', build: makeCherries },
+];
+const FRUIT = Object.fromEntries(FRUITS.map((f) => [f.id, f]));
+
+/* =====================================================================
+   Baby dinosaurs
+   ===================================================================== */
+const DINO_SPECS = [
+  { kind: 'rex', color: '#7fd46b', belly: '#eaf8bf', accent: '#ffcf4a', spot: { x: -2.75, z: -0.35, ry: 0.38 } },
+  { kind: 'trike', color: '#b59cff', belly: '#f3e9ff', accent: '#ff9ecb', spot: { x: 0, z: -1.25, ry: 0 } },
+  { kind: 'stego', color: '#ffa65c', belly: '#ffe9cc', accent: '#4fcfc4', spot: { x: 2.75, z: -0.35, ry: -0.38 } },
+];
+
+const surfZ = (cy, rx, ry, rz, cz, x, y) => cz + rz * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2 - ((y - cy) / ry) ** 2));
+
+function makeDino(spec, index) {
+  const d = { spec, index, fed: false, state: 'idle', action: null, phase: rand(0, 6), anticipate: 0, accs: [], hat: null };
+  const root = new THREE.Group();
+  root.position.set(spec.spot.x, 0, spec.spot.z);
+  root.rotation.y = spec.spot.ry;
+  world.add(root);
+  const squash = new THREE.Group(); root.add(squash);
+  const body = new THREE.Group(); squash.add(body);
+  const C = clay(spec.color), B = clay(spec.belly), A = clay(spec.accent);
+  const white = clay('#ffffff', { rough: 0.3 }), black = clay('#2a2233', { rough: 0.25 });
+  const cheekM = clay('#ff8fb1', { transparent: true, opacity: 0.8, unique: true });
+
+  // torso & belly
+  blob(C, 0.82, 0.78, 0.88, 0, 0.95, 0, body);
+  blob(B, 0.58, 0.6, 0.42, 0, 0.88, 0.48, body);
+
+  // legs
+  d.legs = [];
+  for (const s of [-1, 1]) {
+    const leg = new THREE.Group(); leg.position.set(0.45 * s, 0.42, 0.06); body.add(leg);
+    blob(C, 0.27, 0.36, 0.3, 0, 0, 0, leg);
+    blob(C, 0.3, 0.17, 0.38, 0, -0.27, 0.1, leg);
+    for (let k = -1; k <= 1; k++) blob(white, 0.065, 0.05, 0.06, k * 0.12, -0.3, 0.45, leg, false, SPH_LO);
+    d.legs.push(leg);
+  }
+  // little arms
+  d.arms = [];
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Group(); arm.position.set(0.64 * s, 1.18, 0.34); body.add(arm);
+    blob(C, 0.13, 0.27, 0.14, 0, -0.18, 0.04, arm);
+    blob(B, 0.1, 0.08, 0.1, 0, -0.42, 0.06, arm, true, SPH_LO);
+    d.arms.push(arm);
+  }
+  // wiggly tail (nested joints)
+  d.tail = [];
+  let parent = body;
+  const segs = [[0, 0.72, -0.62, 0.36], [0, 0.05, -0.36, 0.28], [0, 0.07, -0.3, 0.2], [0, 0.07, -0.24, 0.13]];
+  segs.forEach(([x, y, z, r], i) => {
+    const j = new THREE.Group(); j.position.set(x, y, z); parent.add(j);
+    blob(C, r, r * 0.92, r * 1.25, 0, 0, -r * 0.4, j);
+    d.tail.push(j);
+    parent = j;
+  });
+
+  // head
+  const head = new THREE.Group(); head.position.set(0, 1.62, 0.3); body.add(head);
+  d.head = head;
+  blob(C, 0.66, 0.58, 0.6, 0, 0.38, 0, head);
+  blob(C, 0.5, 0.32, 0.42, 0, 0.22, 0.42, head);
+  for (const s of [-1, 1]) blob(black, 0.035, 0.025, 0.025, s * 0.12, 0.42, 0.78, head, false, SPH_LO);
+  // smile drawn on the snout surface
+  const smilePts = [];
+  for (let i = 0; i <= 16; i++) {
+    const u = i / 16 * 2 - 1;
+    const x = 0.21 * u, y = 0.15 - 0.06 * (1 - u * u);
+    smilePts.push(V(x, y, surfZ(0.22, 0.5, 0.32, 0.42, 0.42, x, y) + 0.008));
+  }
+  mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(smilePts), 20, 0.024, 6), black, head, 0, 0, 0, false);
+  // jaw (opens for chomps)
+  const jaw = new THREE.Group(); jaw.position.set(0, 0.12, 0.12); head.add(jaw);
+  d.jaw = jaw;
+  blob(B, 0.42, 0.17, 0.38, 0, -0.04, 0.32, jaw);
+  blob(clay('#9b2e4a'), 0.34, 0.08, 0.3, 0, 0.05, 0.31, jaw, false);
+  d.tongue = blob(clay('#ff7a9a'), 0.18, 0.06, 0.2, 0, 0.09, 0.38, jaw, false);
+
+  // eyes: open eye + happy ^ arc
+  d.eyes = [];
+  for (const s of [-1, 1]) {
+    const eg = new THREE.Group(); eg.position.set(s * 0.27, 0.56, 0.44); eg.rotation.y = s * 0.28; head.add(eg);
+    const open = new THREE.Group(); eg.add(open);
+    blob(white, 0.18, 0.2, 0.13, 0, 0, 0, open, false);
+    const pupil = new THREE.Group(); pupil.position.z = 0.09; open.add(pupil);
+    blob(black, 0.105, 0.125, 0.06, 0, 0, 0.0, pupil, false);
+    blob(white, 0.035, 0.035, 0.02, 0.035, 0.05, 0.055, pupil, false, SPH_LO);
+    const arc = new THREE.Mesh(geo('happyEye', () => new THREE.TorusGeometry(0.12, 0.035, 8, 20, Math.PI)), black);
+    arc.position.set(0, -0.02, 0.1);
+    eg.add(arc);
+    d.eyes.push({ eg, open, pupil, arc, s });
+  }
+  d.brows = [];
+  for (const s of [-1, 1]) {
+    const br = blob(clay(new THREE.Color(spec.color).multiplyScalar(0.55).getStyle()), 0.11, 0.032, 0.04, s * 0.27, 0.83, 0.38, head, false);
+    br.userData.s = s;
+    d.brows.push(br);
+  }
+  d.cheeks = [];
+  for (const s of [-1, 1]) {
+    const ck = blob(cheekM, 0.12, 0.075, 0.04, s * 0.46, 0.26, 0.42, head, false);
+    ck.rotation.y = s * 0.7;
+    d.cheeks.push(ck);
+  }
+
+  // species details
+  if (spec.kind === 'rex') {
+    const cone = geo('spike', () => new THREE.ConeGeometry(0.12, 0.3, 10));
+    [0.35, 0.85, 1.35, 1.85].forEach((phi) => {
+      const m = mesh(cone, A, body, 0, 0.95 + 0.8 * Math.cos(phi), -0.9 * Math.sin(phi));
+      m.rotation.x = -phi;
+    });
+    [[0.97, -0.02, -0.15], [0.86, -0.32, -0.8]].forEach(([y, z, r]) => { const m = mesh(cone, A, head, 0, y, z); m.rotation.x = r; m.scale.setScalar(0.85); });
+  } else if (spec.kind === 'trike') {
+    const frill = blob(A, 0.86, 0.68, 0.12, 0, 0.66, -0.3, head);
+    frill.rotation.x = -0.45;
+    for (let i = 0; i < 9; i++) {
+      const a = Math.PI * (0.05 + 0.9 * i / 8);
+      blob(clay('#ffd6ea'), 0.1, 0.1, 0.08, Math.cos(a) * 0.82, 0.66 + Math.sin(a) * 0.62, -0.3 - Math.sin(a) * 0.28, head, false, SPH_LO);
+    }
+    const horn = clay('#fff4dc');
+    const hg = geo('horn', () => new THREE.ConeGeometry(0.075, 0.32, 12));
+    for (const s of [-1, 1]) { const h = mesh(hg, horn, head, s * 0.25, 0.92, 0.25); h.rotation.set(0.55, 0, -s * 0.2); }
+    const nh = mesh(hg, horn, head, 0, 0.5, 0.78); nh.rotation.x = 0.7; nh.scale.setScalar(0.65);
+  } else {
+    const plate = A;
+    [0.25, 0.65, 1.05, 1.45, 1.85].forEach((phi, i) => {
+      const m = blob(plate, 0.06, 0.26 - Math.abs(phi - 1.05) * 0.06, 0.2, (i % 2 ? 0.07 : -0.07), 0.95 + 0.86 * Math.cos(phi), -0.95 * Math.sin(phi), body);
+      m.rotation.x = -phi;
+    });
+    const sg = geo('tspike', () => new THREE.ConeGeometry(0.06, 0.22, 8));
+    for (const s of [-1, 1]) { const m = mesh(sg, clay('#fff4dc'), d.tail[3], s * 0.1, 0.06, -0.12); m.rotation.z = -s * 1.1; }
+    for (let i = 0; i < 4; i++) blob(clay('#ffc48a'), 0.14, 0.03, 0.14, rand(-0.5, 0.5), 1.2 + rand(-0.15, 0.25), rand(-0.3, 0.2), body, false, SPH_LO).lookAt(V(0, 3, 0));
+  }
+
+  // accessory anchors
+  d.hatAnchor = new THREE.Group(); d.hatAnchor.position.set(0, spec.kind === 'trike' ? 0.98 : 0.94, 0.08); head.add(d.hatAnchor);
+  d.faceAnchor = new THREE.Group(); d.faceAnchor.position.set(0, 0.56, 0.6); head.add(d.faceAnchor);
+  d.sideAnchor = new THREE.Group(); d.sideAnchor.position.set(0.5, 0.78, 0.12); head.add(d.sideAnchor);
+  d.neckAnchor = new THREE.Group(); d.neckAnchor.position.set(0, 1.38, 0.0); body.add(d.neckAnchor);
+
+  Object.assign(d, {
+    root, squash, body, cheekM,
+    squashS: new Spring(220, 9), wob: new Spring(160, 7),
+    cur: null, blinkT: rand(1, 4), blink: 0, lookAt: V(), lookCam: true,
+    mouthWorld: () => head.localToWorld(V(0, 0.15, 0.95)),
+    headWorld: () => head.localToWorld(V(0, 0.4, 0.15)),
+    bodyWorld: () => root.localToWorld(V(0, 0.95, 0)),
+  });
+  return d;
+}
+const dinos = DINO_SPECS.map((s, i) => makeDino(s, i));
+
+/* ---------- accessories (change every round) ---------- */
+const ACC = {
+  glasses(d, color) {
+    const g = new THREE.Group();
+    const m = clay(color, { rough: 0.35 });
+    const lens = clay('#bfe9ff', { transparent: true, opacity: 0.35, rough: 0.1, noBump: true });
+    const tor = geo('gring', () => new THREE.TorusGeometry(0.16, 0.035, 8, 28));
+    for (const s of [-1, 1]) {
+      const r = mesh(tor, m, g, s * 0.27, 0, 0.04 - 0.02); r.rotation.y = s * 0.28;
+      const l = mesh(geo('glens', () => new THREE.CircleGeometry(0.15, 24)), lens, g, s * 0.27, 0, 0.03, false); l.rotation.y = s * 0.28;
+    }
+    mesh(geo('gbridge', () => new THREE.CylinderGeometry(0.025, 0.025, 0.24, 6)), m, g, 0, 0.03, 0.08).rotation.z = Math.PI / 2;
+    d.faceAnchor.add(g);
+    return g;
+  },
+  heartGlasses(d, color) {
+    const g = new THREE.Group();
+    const m = clay(color, { transparent: true, opacity: 0.7, rough: 0.2, noBump: true });
+    for (const s of [-1, 1]) {
+      const h = mesh(heartGeo(), m, g, s * 0.27, 0, 0.02, false);
+      h.scale.set(0.42, 0.42, 0.25); h.rotation.y = s * 0.28;
+    }
+    mesh(geo('gbridge', () => new THREE.CylinderGeometry(0.025, 0.025, 0.24, 6)), clay(color), g, 0, 0.05, 0.06).rotation.z = Math.PI / 2;
+    d.faceAnchor.add(g);
+    return g;
+  },
+  flower(d, color) {
+    const g = new THREE.Group();
+    g.rotation.set(0, 0.9, -0.3);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      blob(clay(color), 0.11, 0.11, 0.05, Math.cos(a) * 0.14, Math.sin(a) * 0.14, 0, g, false);
+    }
+    blob(clay('#ffe066'), 0.09, 0.09, 0.07, 0, 0, 0.04, g, false);
+    d.sideAnchor.add(g);
+    return g;
+  },
+  bow(d, color) {
+    const g = new THREE.Group();
+    g.position.set(-0.85, 0.15, 0);
+    g.rotation.set(0.1, -0.5, 0.35);
+    const m = clay(color);
+    for (const s of [-1, 1]) { const l = blob(m, 0.2, 0.14, 0.07, s * 0.17, 0, 0, g); l.rotation.z = s * 0.35; }
+    blob(m, 0.08, 0.08, 0.08, 0, 0, 0.02, g);
+    d.sideAnchor.add(g);
+    return g;
+  },
+  bowtie(d, color) {
+    const g = new THREE.Group();
+    g.position.set(0, -0.06, 0.8);
+    const m = clay(color);
+    const cg = geo('btcone', () => new THREE.ConeGeometry(0.15, 0.26, 12));
+    for (const s of [-1, 1]) { const c = mesh(cg, m, g, s * 0.13, 0, 0); c.rotation.z = s * Math.PI / 2; c.scale.z = 0.5; }
+    blob(m, 0.07, 0.07, 0.06, 0, 0, 0.02, g);
+    blob(clay('#ffffff'), 0.03, 0.03, 0.02, -0.18, 0.04, 0.07, g, false, SPH_LO);
+    blob(clay('#ffffff'), 0.03, 0.03, 0.02, 0.18, -0.03, 0.07, g, false, SPH_LO);
+    d.neckAnchor.add(g);
+    return g;
+  },
+  scarf(d, color) {
+    const g = new THREE.Group();
+    g.position.set(0, 0.06, 0);
+    const m = clay(color);
+    const t = mesh(geo('scarf', () => new THREE.TorusGeometry(0.62, 0.13, 12, 36)), m, g);
+    t.rotation.x = Math.PI / 2 - 0.15;
+    t.scale.set(1.05, 1.1, 1);
+    const tail = blob(m, 0.13, 0.32, 0.07, 0.3, -0.25, 0.62, g);
+    tail.rotation.z = 0.3;
+    for (let k = 0; k < 3; k++) blob(clay('#ffffff'), 0.04, 0.04, 0.02, 0.28 + k * 0.03, -0.1 - k * 0.15, 0.69, g, false, SPH_LO);
+    d.neckAnchor.add(g);
+    return g;
+  },
+  necklace(d) {
+    const g = new THREE.Group();
+    g.position.set(0, -0.02, 0.02);
+    g.rotation.x = -0.18;
+    const n = 16;
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2;
+      blob(clay(PASTELS[k % PASTELS.length], { rough: 0.25 }), 0.07, 0.07, 0.07, Math.sin(a) * 0.66, 0, Math.cos(a) * 0.72, g, false, SPH_LO);
+    }
+    d.neckAnchor.add(g);
+    return g;
+  },
+};
+const FACE_ACC = ['glasses', 'heartGlasses', 'flower', 'bow'];
+const NECK_ACC = ['bowtie', 'scarf', 'necklace'];
+const ACC_COLORS = ['#ff6fa8', '#4fb8ff', '#ffd23f', '#8be38b', '#b38bff', '#ff8c5a'];
+
+function dressDinos(withPoof) {
+  for (const d of dinos) {
+    for (const a of d.accs) a.removeFromParent();
+    const prev = d.accNames || [];
+    const face = pick(FACE_ACC.filter((n) => !prev.includes(n)));
+    const neck = pick(NECK_ACC.filter((n) => !prev.includes(n)));
+    d.accNames = [face, neck];
+    d.accs = [ACC[face](d, pick(ACC_COLORS)), ACC[neck](d, pick(ACC_COLORS))];
+    for (const a of d.accs) {
+      a.userData.base = a.scale.clone();
+      if (withPoof) {
+        a.scale.setScalar(0.001);
+        tween(0.5, (k) => a.scale.copy(a.userData.base).multiplyScalar(Math.max(0.001, ease.outBack(k))), null, 0.15);
+      }
+    }
+    if (withPoof) puff(d.headWorld(), 7);
+  }
+}
+dressDinos(false);
+
+/* ---------- dinosaur animation ---------- */
+const ACTIONS = {
+  chomp: {
+    dur: 1.35,
+    events: [[0.05, (d) => chompFx(d)], [0.47, (d) => chompFx(d)], [0.89, (d) => chompFx(d)]],
+    fn(P, t) {
+      const c = Math.max(0, Math.sin((t / 0.42) * Math.PI * 2 + 0.3));
+      P.jaw = 0.05 + 0.6 * c; P.sy -= 0.1 * c; P.sx += 0.06 * c; P.hx = 0.12 * c;
+      P.happy = 1; P.cheek = 1.2; P.tailAmp = 0.5; P.tailSpeed = 11;
+    },
+  },
+  wiggle: {
+    dur: 1.3,
+    events: [[0.0, () => Sound.play('yum')]],
+    fn(P, t, k) {
+      P.rz = 0.24 * Math.sin(t * 17) * (1 - k * 0.5);
+      P.y = Math.abs(Math.sin(t * 8)) * 0.18;
+      P.armL = P.armR = 2.2 + 0.4 * Math.sin(t * 20);
+      P.happy = 1; P.cheek = 1.2; P.tailAmp = 0.9; P.tailSpeed = 18; P.jaw = 0.25;
+    },
+  },
+  burp: {
+    dur: 1.45,
+    events: [[0.36, (d) => { Sound.play('burp'); burstHearts(d.mouthWorld().add(V(0, 0.15, 0.2)), 6, 0.34); }], [1.0, () => Sound.play('giggle')]],
+    fn(P, t) {
+      if (t < 0.36) {
+        const e = ease.inOut(t / 0.36);
+        P.sx += 0.16 * e; P.sz += 0.16 * e; P.sy -= 0.04 * e; P.cheek = 1.5; P.eyeScale = 1.15; P.jaw = 0;
+      } else if (t < 0.95) {
+        P.hx = -0.45; P.jaw = 0.65; P.eyeOpen = 0.4; P.sx += 0.05; P.rx = -0.1;
+      } else {
+        P.happy = 1; P.cheek = 1.3; P.armR = -0.4; P.y = Math.abs(Math.sin(t * 14)) * 0.07;
+      }
+    },
+  },
+  yuck: {
+    dur: 1.9,
+    events: [[0.05, () => Sound.play('sniff')], [0.55, () => Sound.play('yuck')], [1.45, () => Sound.play('giggle')]],
+    fn(P, t) {
+      if (t < 0.5) { P.hx = 0.28; P.z = 0.25; P.eyeScale = 1.1; P.browY = 0.03; }
+      else if (t < 1.4) {
+        P.eyeOpen = 0.32; P.brow = 0.38; P.tongue = 1; P.jaw = 0.38;
+        P.hy = 0.38 * Math.sin(t * 15); P.armL = P.armR = 0.9; P.sy -= 0.04;
+      } else { P.happy = 1; P.y = Math.abs(Math.sin(t * 14)) * 0.08; P.cheek = 1.1; }
+    },
+  },
+  shake: { // "not me, thanks!" for fed / waiting dinos
+    dur: 1.2,
+    events: [[0.05, () => Sound.play('mmm')]],
+    fn(P, t) {
+      P.happy = 1; P.hy = 0.32 * Math.sin(t * 9); P.armL = P.armR = -0.35; P.cheek = 1.1; P.sy += 0.03 * Math.sin(t * 18);
+    },
+  },
+  giggle: {
+    dur: 1.0,
+    events: [[0.0, () => Sound.play('giggle')]],
+    fn(P, t) {
+      P.happy = 1; P.cheek = 1.3; P.y = Math.abs(Math.sin(t * 14)) * 0.09; P.rz = 0.1 * Math.sin(t * 12);
+      P.armL = P.armR = 0.9; P.jaw = 0.2;
+    },
+  },
+  wave: {
+    dur: 1.4,
+    fn(P, t) { P.armR = 2.4 + 0.45 * Math.sin(t * 12); P.happy = 1; P.hz = 0.15; P.jaw = 0.18; },
+  },
+};
+function playAction(d, name, onDone) {
+  d.action = { a: ACTIONS[name], name, t: 0, fired: new Set(), onDone };
+}
+function chompFx(d) {
+  Sound.play('chomp');
+  d.squashS.kick(-2.2);
+  crumbs(d.mouthWorld(), d.lastSnackColor || '#ffcc66', 6);
+}
+
+const BPM = Sound.BPM;
+const DANCE_BEATS = 24;
+const DANCE_LEN = (DANCE_BEATS * 60) / BPM;
+
+const tmpV = V();
+function updateDino(d, dt) {
+  const P = {
+    x: 0, y: 0, z: 0, ry: 0, rz: 0, rx: 0, sx: 1, sy: 1, sz: 1, hx: 0, hy: 0, hz: 0,
+    jaw: 0.03, armL: 0, armR: 0, tailAmp: 0.25, tailSpeed: 3, eyeOpen: 1, eyeScale: 1,
+    brow: 0, browY: 0, tongue: 0, happy: 0, cheek: 0.6, legs: 0, cross: 0,
+  };
+  const ph = d.phase;
+  const br = Math.sin(T * 2.2 + ph) * AMBIENT;
+  P.sy += 0.025 * br; P.sx -= 0.012 * br; P.sz -= 0.012 * br;
+
+  switch (d.state) {
+    case 'idle':
+      P.hz = 0.08 * Math.sin(T * 0.9 + ph) * AMBIENT;
+      P.hy = 0.12 * Math.sin(T * 0.5 + ph * 2) * AMBIENT;
+      break;
+    case 'want': {
+      const hop = Math.abs(Math.sin(T * 3.4 + ph));
+      P.y = hop * 0.12; P.sy += (hop - 0.5) * 0.06;
+      P.z = 0.45;
+      P.armL = 0.7 + 0.5 * Math.sin(T * 6.8); P.armR = 0.7 + 0.5 * Math.sin(T * 6.8 + Math.PI);
+      P.browY = 0.05; P.eyeScale = 1.08; P.jaw = 0.16; P.hz = 0.12 * Math.sin(T * 1.6);
+      P.tailAmp = 0.5; P.tailSpeed = 7; P.cheek = 0.9;
+      break;
+    }
+    case 'sit':
+      P.y = -0.3; P.sy *= 0.93; P.sx *= 1.05; P.sz *= 1.05; P.legs = -1.25;
+      P.happy = 0.8; P.cheek = 0.9; P.tailAmp = 0.35; P.tailSpeed = 2.5;
+      P.hz = 0.1 * Math.sin(T * 1.2 + ph) * AMBIENT; P.armL = P.armR = 0.2;
+      break;
+    case 'dance':
+      dancePose(d, P);
+      break;
+  }
+
+  if (d.anticipate > 0.01) {
+    const a = d.anticipate;
+    P.jaw = lerp(P.jaw, 0.6, a); P.eyeScale = lerp(P.eyeScale, 1.2, a); P.hx = lerp(P.hx, 0.15, a);
+    P.happy = 0; P.z += 0.15 * a; P.armL = lerp(P.armL, 1.4, a); P.armR = lerp(P.armR, 1.4, a);
+  }
+
+  if (d.action) {
+    const A = d.action;
+    A.t += dt;
+    const k = Math.min(1, A.t / A.a.dur);
+    if (A.a.events) A.a.events.forEach(([time, fn], i) => { if (A.t >= time && !A.fired.has(i)) { A.fired.add(i); fn(d); } });
+    A.a.fn(P, A.t, k, d);
+    if (k >= 1) { d.action = null; A.onDone && A.onDone(); }
+  }
+
+  // blinking
+  d.blinkT -= dt;
+  if (d.blinkT < 0) { d.blink = 0.14; d.blinkT = rand(2, 5); }
+  if (d.blink > 0) { d.blink -= dt; P.eyeOpen *= 0.12; }
+
+  // squishy springs
+  d.squashS.update(dt); d.wob.update(dt);
+  P.sy += d.squashS.x; P.sx -= d.squashS.x * 0.5; P.sz -= d.squashS.x * 0.5;
+  P.rz += d.wob.x;
+
+  // smooth towards pose
+  if (!d.cur) d.cur = { ...P };
+  const c = d.cur;
+  const L = 18;
+  for (const key in P) {
+    if (key === 'ry') c.ry += wrapAngle(P.ry - c.ry) * (1 - Math.exp(-L * dt));
+    else c[key] = damp(c[key], P[key], L, dt);
+  }
+
+  const sp = d.spec.spot;
+  const ry = sp.ry + c.ry;
+  d.root.position.set(sp.x + Math.sin(sp.ry) * c.z + c.x, 0, sp.z + Math.cos(sp.ry) * c.z);
+  d.root.rotation.y = ry;
+  d.squash.position.y = c.y;
+  d.squash.scale.set(c.sx, c.sy, c.sz);
+  d.body.rotation.set(c.rx, 0, c.rz);
+  d.head.rotation.set(c.hx, c.hy, c.hz);
+  d.jaw.rotation.x = c.jaw;
+  d.arms[0].rotation.z = -(0.5 + c.armL);
+  d.arms[1].rotation.z = 0.5 + c.armR;
+  d.legs.forEach((l) => (l.rotation.x = c.legs));
+  d.tail.forEach((j, i) => (j.rotation.y = c.tailAmp * 0.45 * Math.sin(T * c.tailSpeed - i * 0.7)));
+  d.tongue.position.z = 0.38 + c.tongue * 0.3;
+  d.tongue.position.y = 0.09 - c.tongue * 0.04;
+  d.tongue.scale.set(0.18, 0.06, 0.2 + c.tongue * 0.1);
+  d.cheeks.forEach((ck) => ck.scale.set(0.12 * (0.8 + c.cheek * 0.3), 0.075 * (0.8 + c.cheek * 0.3), 0.04));
+  d.cheekM.opacity = clamp(0.45 + c.cheek * 0.35, 0, 0.95);
+  d.brows.forEach((b) => { b.rotation.z = -b.userData.s * c.brow; b.position.y = 0.83 + c.browY; });
+
+  // eyes look at the camera (the child!) or at the snack
+  const look = d.lookCam ? camera.position : d.lookAt;
+  const lp = d.head.worldToLocal(tmpV.copy(look));
+  const lx = clamp(lp.x / (Math.abs(lp.z) + 2), -1, 1), lyv = clamp((lp.y - 0.5) / (Math.abs(lp.z) + 2), -1, 1);
+  for (const e of d.eyes) {
+    const happy = clamp(c.happy, 0, 1);
+    e.open.scale.set(c.eyeScale, c.eyeScale * c.eyeOpen * (1 - happy) + 0.001, c.eyeScale);
+    e.arc.scale.setScalar(happy + 0.001);
+    e.arc.visible = happy > 0.05;
+    e.pupil.position.x = clamp(lx * 0.07 - e.s * c.cross * 0.06, -0.07, 0.07);
+    e.pupil.position.y = clamp(lyv * 0.06, -0.06, 0.06);
+  }
+}
+
+function dancePose(d, P) {
+  const b = G.danceT * BPM / 60;
+  const i = d.index;
+  P.happy = 0.75; P.cheek = 1.1; P.tailAmp = 0.6; P.tailSpeed = 9;
+  if (b >= DANCE_BEATS) { P.armL = P.armR = 2.5; P.happy = 1; P.y = 0.1; P.jaw = 0.4; return; }
+  const bar = Math.floor(b / 4), bb = b - bar * 4;
+  const bounce = Math.abs(Math.sin(Math.PI * b));
+  P.legs = 0.25 * Math.sin(Math.PI * b);
+  switch (bar % 6) {
+    case 0: // bouncy arms
+      P.y = bounce * 0.22; P.sy += (bounce - 0.5) * 0.12;
+      P.armL = 1.2 + Math.sin(Math.PI * b) * 1.0; P.armR = 1.2 - Math.sin(Math.PI * b) * 1.0;
+      P.hz = Math.sin(Math.PI * b) * 0.22; P.jaw = 0.2;
+      break;
+    case 1: { // spin!
+      const dir = i % 2 ? -1 : 1;
+      P.ry = dir * ease.inOut(clamp(bb / 3.5, 0, 1)) * Math.PI * 2;
+      P.y = bounce * 0.14; P.armL = P.armR = 2.2;
+      break;
+    }
+    case 2: // turn around and wiggle that tail
+      P.ry = Math.PI * ease.inOut(clamp(bb / 0.6, 0, 1)) * (bb < 3.4 ? 1 : 1 - (bb - 3.4) / 0.6);
+      P.rz = Math.sin(Math.PI * 2 * b) * 0.25; P.tailAmp = 1.3; P.tailSpeed = 16;
+      P.y = bounce * 0.08; P.armL = P.armR = 0.8;
+      break;
+    case 3: { // jumps with a little stagger
+      const jb = ((b + i * 0.25) % 2) / 2;
+      const air = Math.sin(Math.PI * clamp(jb * 1.35, 0, 1));
+      P.y = air * 0.75; P.armL = P.armR = 0.4 + air * 2.1; P.rx = -air * 0.15;
+      if (jb > 0.74) P.sy -= 0.22 * Math.sin(Math.PI * (jb - 0.74) / 0.26);
+      P.jaw = 0.3 * air;
+      break;
+    }
+    case 4: // head bop + helicopter tail
+      P.hz = Math.sin(Math.PI * b) * 0.4; P.hx = 0.15 * bounce; P.rz = Math.sin(Math.PI * b) * 0.14;
+      P.armL = 1.8 + Math.sin(Math.PI * 2 * b) * 0.6; P.armR = 1.8 - Math.sin(Math.PI * 2 * b) * 0.6;
+      P.tailAmp = 1.3; P.tailSpeed = 14; P.y = bounce * 0.1;
+      break;
+    case 5: // goofy noodle with silly face
+      P.rz = Math.sin(Math.PI * b * 0.5) * 0.35; P.rx = Math.cos(Math.PI * b * 0.5) * 0.12;
+      P.jaw = 0.45; P.tongue = 1; P.happy = 0; P.eyeScale = 1.2; P.cross = 1;
+      P.armL = 2.5 * bounce; P.armR = 2.5 * (1 - bounce); P.y = bounce * 0.15;
+      break;
+  }
+}
+
+/* =====================================================================
+   "I want this!" picture bubble (rendered on top of everything)
+   ===================================================================== */
+const bubble = (() => {
+  const g = new THREE.Group();
+  g.visible = false;
+  overlay.add(g);
+  const wm = clay('#ffffff', { rough: 0.6 });
+  blob(wm, 1.05, 1.0, 0.26, 0, 0, 0, g, false);
+  blob(clay('#bfe3ff'), 1.13, 1.08, 0.18, 0, 0, -0.07, g, false);
+  blob(wm, 0.2, 0.2, 0.1, -0.42, -1.1, 0, g, false);
+  blob(wm, 0.12, 0.12, 0.07, -0.66, -1.4, 0, g, false);
+  const holder = new THREE.Group();
+  holder.position.z = 0.4;
+  g.add(holder);
+  let dino = null, model = null;
+  const pop = new Spring(260, 15);
+  const wig = new Spring(180, 6);
+  return {
+    get dino() { return dino; },
+    show(d, kind) {
+      dino = d;
+      if (model) holder.remove(model);
+      model = kind.build();
+      model.scale.setScalar(1.3);
+      model.traverse((m) => { m.castShadow = false; });
+      holder.add(model);
+      pop.target = 1;
+      pop.kick(2);
+      g.visible = true;
+    },
+    hide() { pop.target = 0; },
+    wiggle() { wig.kick(9); },
+    update(dt) {
+      pop.update(dt); wig.update(dt);
+      if (pop.target === 0 && pop.x < 0.02) { g.visible = false; return; }
+      if (!dino) return;
+      const h = dino.head.localToWorld(V(0, 0.4, 0));
+      g.position.set(h.x + 0.6 * G.bubbleScale, h.y + 0.85 + 1.1 * G.bubbleScale, h.z);
+      g.quaternion.copy(camera.quaternion);
+      g.rotateZ(wig.x * 0.12);
+      g.scale.setScalar(Math.max(0.001, pop.x) * G.bubbleScale);
+      holder.rotation.y = Math.sin(T * 1.6) * 0.45;
+      holder.position.y = Math.sin(T * 2.4) * 0.05;
+    },
+  };
+})();
+
+/* =====================================================================
+   Decorations (flowers, cushions, party hats)
+   ===================================================================== */
+const DECOR_COLORS = {
+  flower: ['#ff6fa8', '#ffd23f', '#7ad7ff', '#c48bff', '#ff8c5a'],
+  cushion: ['#ff9ec7', '#9ed8ff', '#ffe066', '#b9f5a6', '#c9a7ff'],
+  hat: ['#ff6fa8', '#4fb8ff', '#ffd23f', '#5fd36b', '#b38bff'],
+};
+function buildDecor(kind, color) {
+  const g = new THREE.Group();
+  let mat;
+  if (kind === 'flower') {
+    mesh(geo('pot', () => lathe([[0, 0], [0.2, 0], [0.26, 0.3], [0.31, 0.31], [0.32, 0.42], [0.25, 0.42], [0.24, 0.38], [0, 0.38]], 28)), clay('#e07a4f'), g);
+    blob(clay('#7a4b2a'), 0.24, 0.04, 0.24, 0, 0.38, 0, g, false);
+    mesh(geo('fstem2', () => new THREE.CylinderGeometry(0.035, 0.045, 0.55, 8)), clay('#4fb84a'), g, 0, 0.66, 0);
+    const lf = blob(leafMat(), 0.16, 0.04, 0.08, 0.1, 0.62, 0, g); lf.rotation.z = 0.5;
+    const head = new THREE.Group(); head.position.set(0, 0.95, 0.02); head.rotation.x = 0.5; g.add(head);
+    mat = clay(color, { unique: true });
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      const p = blob(mat, 0.1, 0.13, 0.05, Math.cos(a) * 0.15, Math.sin(a) * 0.15, 0, head);
+      p.rotation.z = a - Math.PI / 2;
+    }
+    blob(clay('#ffe066'), 0.1, 0.1, 0.08, 0, 0, 0.03, head);
+  } else if (kind === 'cushion') {
+    mat = clay(color, { unique: true, rough: 0.8 });
+    const c = mesh(geo('cush', () => new RoundedBoxGeometry(0.85, 0.3, 0.85, 4, 0.14)), mat, g, 0, 0.15, 0);
+    c.scale.set(1, 1, 1);
+    blob(clay('#ffffff'), 0.07, 0.05, 0.07, 0, 0.3, 0, g, false, SPH_LO);
+    for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) blob(clay('#ffffff'), 0.06, 0.06, 0.06, x * 0.4, 0.15, z * 0.4, g, false, SPH_LO);
+  } else {
+    mat = new THREE.MeshStandardMaterial({ color: '#ffffff', map: hatTex(color), roughness: 0.6, bumpMap: clayTex, bumpScale: 1.2 });
+    mesh(geo('hatcone', () => new THREE.ConeGeometry(0.28, 0.72, 28)), mat, g, 0, 0.36, 0);
+    blob(clay('#fff6c2'), 0.11, 0.11, 0.11, 0, 0.75, 0, g);
+    const br = mesh(geo('hatbrim', () => new THREE.TorusGeometry(0.27, 0.045, 8, 28)), clay('#ffffff'), g, 0, 0.03, 0);
+    br.rotation.x = Math.PI / 2;
+  }
+  return { g, mat, kind, color };
+}
+function recolorDecor(item) {
+  const list = DECOR_COLORS[item.kind];
+  item.color = list[(list.indexOf(item.color) + 1) % list.length];
+  if (item.kind === 'hat') item.mat.map = hatTex(item.color);
+  else item.mat.color.set(item.color);
+}
+
+const DECOR_SLOTS = {
+  cushion: [[-1.4, 1.0], [0, 1.15], [1.4, 1.0], [-0.75, 0.25], [0.75, 0.25]],
+  flower: [[-2.8, 2.35], [2.8, 2.35], [-3.45, 1.0], [3.45, 1.0], [-1.35, -1.05], [1.35, -1.05]],
+  hat: [['dino', 0], ['dino', 1], ['dino', 2], [-1.95, 0.3], [1.95, 0.3], [0, 0.4]],
+};
+const TRAY_KINDS = ['flower', 'cushion', 'hat'];
+
+/* =====================================================================
+   Game state
+   ===================================================================== */
+const G = {
+  phase: 'start',
+  round: 0,
+  wants: [],
+  prevWants: [],
+  order: [],
+  active: null,
+  fruits: [],
+  selected: null,
+  fruitSize: 1.05,
+  bubbleScale: 1,
+  fedCount: 0,
+  decorCount: 0,
+  decor: { flower: [], cushion: [], hat: [] },
+  tray: [],
+  danceT: 0,
+  lastAction: 0,
+  portrait: false,
+  hintsShown: 0,
+};
+
+/* ---------- fruit objects ---------- */
+function makeFruit(kind, slot) {
+  const g = new THREE.Group();
+  const model = kind.build();
+  g.add(model);
+  world.add(g);
+  const f = {
+    kind, g, model, slot, home: V(), state: 'home', sCur: 1, sTarget: 1, pop: 0,
+    spring: new Spring(200, 8), phase: rand(0, 6), dragTarget: V(), hoverFn: null,
+  };
+  layoutFruit(f);
+  g.position.copy(f.home).add(V(0, 1.2, 0));
+  g.scale.setScalar(0.001);
+  return f;
+}
+function slotPos(i, n) {
+  const spacing = G.fruitSize * (G.portrait ? 1.22 : 1.3);
+  const x = (i - (n - 1) / 2) * spacing;
+  const span = ((n - 1) / 2) * spacing || 1;
+  const u = x / span;
+  return V(x, 0.72 + G.fruitSize * 0.45 + 0.12 * (1 - u * u), BASKET.z + 0.1 - 0.25 * u * u);
+}
+function layoutFruit(f) { f.home.copy(slotPos(f.slot, 5)); }
+
+const selRing = mesh(new THREE.TorusGeometry(0.62, 0.06, 10, 40), clay('#fff59a', { rough: 0.3, emissive: '#fff59a', emissiveIntensity: 0.3 }), world, 0, 0, 0, false);
+selRing.rotation.x = Math.PI / 2;
+selRing.visible = false;
+
+function updateFruits(dt) {
+  for (const f of G.fruits) {
+    f.spring.update(dt);
+    const S = G.fruitSize;
+    switch (f.state) {
+      case 'home': {
+        tmpV.copy(f.home); tmpV.y += 0.05 * Math.sin(T * 2 + f.phase) * AMBIENT;
+        f.g.position.x = damp(f.g.position.x, tmpV.x, 10, dt);
+        f.g.position.y = damp(f.g.position.y, tmpV.y, 10, dt);
+        f.g.position.z = damp(f.g.position.z, tmpV.z, 10, dt);
+        f.sTarget = 1;
+        f.g.rotation.y = damp(f.g.rotation.y, Math.sin(T * 0.7 + f.phase) * 0.3, 4, dt);
+        f.g.rotation.z = damp(f.g.rotation.z, 0.06 * Math.sin(T * 1.3 + f.phase), 4, dt);
+        f.g.rotation.x = damp(f.g.rotation.x, 0, 6, dt);
+        break;
+      }
+      case 'selected': {
+        tmpV.copy(f.home); tmpV.y += 0.5 + 0.08 * Math.sin(T * 5);
+        f.g.position.lerp(tmpV, 1 - Math.exp(-12 * dt));
+        f.sTarget = 1.15;
+        f.g.rotation.y += dt * 1.6;
+        break;
+      }
+      case 'drag':
+        f.g.position.lerp(f.dragTarget, 1 - Math.exp(-28 * dt));
+        f.sTarget = 1.2;
+        f.g.rotation.z = damp(f.g.rotation.z, Math.sin(T * 8) * 0.12, 8, dt);
+        break;
+      case 'hover':
+        f.g.position.lerp(f.hoverFn(), 1 - Math.exp(-14 * dt));
+        f.sTarget = 0.95;
+        f.g.rotation.z = Math.sin(T * 10) * 0.1;
+        break;
+    }
+    if (f.state !== 'fly') f.sCur = damp(f.sCur, f.sTarget, 12, dt);
+    const sq = f.spring.x;
+    const s = S * f.sCur * f.pop;
+    f.g.scale.set(Math.max(0.001, s * (1 - sq * 0.5)), Math.max(0.001, s * (1 + sq)), Math.max(0.001, s * (1 - sq * 0.5)));
+  }
+  selRing.visible = !!G.selected;
+  if (G.selected) {
+    selRing.position.set(G.selected.home.x, 0.8, G.selected.home.z);
+    selRing.scale.setScalar(G.fruitSize * (1 + 0.06 * Math.sin(T * 4)));
+  }
+}
+
+function removeFruit(f) {
+  f.g.removeFromParent();
+  const i = G.fruits.indexOf(f);
+  if (i >= 0) G.fruits.splice(i, 1);
+  if (G.selected === f) G.selected = null;
+}
+
+function flyFruit(f, getTarget, dur, arc, scaleTo, onDone) {
+  f.state = 'fly';
+  const from = f.g.position.clone();
+  const s0 = f.sCur;
+  const r0 = f.g.rotation.y;
+  tween(dur, (k) => {
+    const e = ease.inOut(k);
+    f.g.position.lerpVectors(from, getTarget(), e);
+    f.g.position.y += Math.sin(Math.PI * k) * arc;
+    f.sCur = lerp(s0, scaleTo, e);
+    f.g.rotation.y = r0 + k * Math.PI * 2;
+  }, onDone);
+}
+
+function returnHome(f) {
+  flyFruit(f, () => f.home, 0.6, 0.9, 1, () => {
+    f.state = 'home';
+    f.spring.kick(-4);
+    Sound.play('boing');
+  });
+}
+
+function select(f) {
+  if (G.selected && G.selected !== f) G.selected.state = 'home';
+  G.selected = f;
+  f.state = 'selected';
+  f.spring.kick(4);
+  Sound.play('pick');
+}
+function deselect() {
+  if (G.selected) { G.selected.state = 'home'; G.selected.spring.kick(-3); }
+  G.selected = null;
+  Sound.play('drop');
+}
+
+/* ---------- feeding ---------- */
+function deliver(f, d) {
+  G.lastAction = T;
+  hideHint();
+  if (G.selected === f) G.selected = null;
+  const di = dinos.indexOf(d);
+  const correct = G.phase === 'feed' && d === G.active && !d.fed && !d.action && f.kind.id === G.wants[di];
+  if (correct) eatFruit(f, d);
+  else rejectFruit(f, d);
+}
+
+function eatFruit(f, d) {
+  G.active = null;
+  bubble.hide();
+  Sound.play('whoosh');
+  d.anticipate = 1;
+  d.lastSnackColor = f.kind.color;
+  flyFruit(f, () => d.mouthWorld(), 0.32, 0.35, 0.7, () => {
+    f.state = 'eaten';
+    const s0 = f.sCur;
+    tween(0.14, (k) => { f.sCur = s0 * (1 - k); f.g.position.copy(d.mouthWorld()); }, () => removeFruit(f));
+    d.anticipate = 0;
+    playAction(d, 'chomp', () => playAction(d, 'wiggle', () => playAction(d, 'burp', () => {
+      d.fed = true;
+      d.state = 'sit';
+      d.lookCam = true;
+      G.fedCount++;
+      wait(0.5, nextDino);
+    })));
+  });
+}
+
+function rejectFruit(f, d) {
+  Sound.play('whoosh');
+  if (d.action) { // busy dino: just bounce it home
+    d.squashS.kick(2);
+    returnHome(f);
+    return;
+  }
+  const hover = () => d.mouthWorld().add(tmpV.copy(camera.position).sub(d.mouthWorld()).normalize().multiplyScalar(0.6)).add(V(0, 0.1, 0));
+  flyFruit(f, hover, 0.3, 0.25, 0.95, () => {
+    f.state = 'hover';
+    f.hoverFn = hover;
+    const isActive = d === G.active;
+    if (isActive) bubble.wiggle();
+    playAction(d, isActive ? 'yuck' : 'shake');
+    wait(isActive ? 1.0 : 0.7, () => returnHome(f));
+  });
+}
+
+function nextDino() {
+  if (G.phase !== 'feed') return;
+  const next = G.order.find((i) => !dinos[i].fed);
+  if (next === undefined) {
+    wait(0.4, enterDecorate);
+    return;
+  }
+  const d = dinos[next];
+  G.active = d;
+  d.state = 'want';
+  bubble.show(d, FRUIT[G.wants[next]]);
+  Sound.play('hmm');
+  G.lastAction = T;
+  if (G.round === 0 && G.fedCount === 0) wait(1.1, () => { if (G.active === d) showDragHint(); });
+}
+
+function startRound() {
+  G.phase = 'feed';
+  G.fedCount = 0;
+  G.active = null;
+  G.selected = null;
+  for (const d of dinos) { d.fed = false; d.state = 'idle'; d.action = null; d.anticipate = 0; }
+  for (const f of [...G.fruits]) removeFruit(f);
+
+  // new snacks: avoid repeating last round's wishes
+  const ids = FRUITS.map((f) => f.id);
+  let wants;
+  for (let tries = 0; tries < 40; tries++) {
+    wants = shuffle(ids).slice(0, 3);
+    if (wants.filter((w) => G.prevWants.includes(w)).length <= 1) break;
+  }
+  G.prevWants = wants;
+  G.wants = wants;
+  const extras = shuffle(ids.filter((k) => !wants.includes(k))).slice(0, 2);
+  const basket = shuffle([...wants, ...extras]);
+  basket.forEach((id, i) => {
+    const f = makeFruit(FRUIT[id], i);
+    G.fruits.push(f);
+    tween(0.5, (k) => { f.pop = Math.max(0.001, ease.outBack(k)); }, () => Sound.play('pop'), 0.15 + i * 0.12);
+  });
+  G.order = G.round === 0 ? [1, 0, 2] : shuffle([0, 1, 2]);
+  G.lastAction = T;
+  wait(1.2, nextDino);
+}
+
+/* ---------- decorating ---------- */
+function enterDecorate() {
+  G.phase = 'decorate';
+  G.decorCount = 0;
+  G.lastAction = T;
+  Sound.play('tada');
+  for (const d of dinos) burstHearts(d.headWorld().add(V(0, 0.6, 0)), 3, 0.26);
+  for (const f of [...G.fruits]) {
+    tween(0.3, (k) => { f.pop = Math.max(0.001, 1 - k); }, () => removeFruit(f));
+  }
+  G.tray = TRAY_KINDS.map((kind, i) => {
+    const item = buildDecor(kind, DECOR_COLORS[kind][0]);
+    item.slot = i;
+    item.spring = new Spring(200, 8);
+    item.pop = 0;
+    world.add(item.g);
+    tween(0.55, (k) => { item.pop = Math.max(0.001, ease.outBack(k)); }, () => Sound.play('pop'), 0.4 + i * 0.15);
+    return item;
+  });
+  if (G.round === 0) wait(1.4, () => { if (G.phase === 'decorate' && G.decorCount === 0) showTapHint(() => toScreen(trayPos(0).add(V(0, 0.5, 0)))); });
+}
+function trayPos(i) {
+  const sp = G.portrait ? 2.25 : 2.3;
+  return V((i - 1) * sp, 0.82, BASKET.z + 0.05);
+}
+function updateTray(dt) {
+  for (const it of G.tray) {
+    it.spring.update(dt);
+    const p = trayPos(it.slot);
+    it.g.position.set(p.x, p.y + 0.06 * Math.sin(T * 2 + it.slot) * AMBIENT, p.z);
+    it.g.rotation.y = Math.sin(T * 0.8 + it.slot) * 0.35;
+    const s = (G.portrait ? 1.35 : 1.25) * it.pop;
+    it.g.scale.set(s * (1 - it.spring.x * 0.5), s * (1 + it.spring.x), s * (1 - it.spring.x * 0.5));
+  }
+  for (const kind of TRAY_KINDS) for (const it of G.decor[kind]) {
+    it.spring.update(dt);
+    const s = it.baseScale * it.pop;
+    it.g.scale.set(s * (1 - it.spring.x * 0.5), s * (1 + it.spring.x), s * (1 - it.spring.x * 0.5));
+  }
+}
+
+function placeDecor(trayItem) {
+  const kind = trayItem.kind;
+  trayItem.spring.kick(4);
+  G.lastAction = T;
+  hideHint();
+  const list = G.decor[kind];
+  const slots = DECOR_SLOTS[kind];
+  if (list.length >= slots.length) {
+    // all spots full: make them all wiggle and change colour
+    Sound.play('sparkle');
+    for (const it of list) { recolorDecor(it); it.spring.kick(4); }
+    G.decorCount++;
+    afterDecor();
+    return;
+  }
+  const slot = slots[list.length];
+  const colors = DECOR_COLORS[kind];
+  const item = buildDecor(kind, colors[list.length % colors.length]);
+  item.spring = new Spring(200, 8);
+  item.pop = 1;
+  item.baseScale = 1;
+  list.push(item);
+  world.add(item.g);
+  const from = trayItem.g.position.clone();
+  let target, onDino = null;
+  if (slot[0] === 'dino') {
+    onDino = dinos[slot[1]];
+    target = () => onDino.hatAnchor.localToWorld(V(0, 0, 0));
+  } else {
+    const p = V(slot[0], BLANKET.top, slot[1]);
+    target = () => p;
+  }
+  item.g.userData.onTap = () => { item.spring.kick(5); recolorDecor(item); Sound.play('tap'); };
+  tapTargets.push(item.g);
+  Sound.play('whoosh');
+  const rot0 = rand(-0.3, 0.3);
+  tween(0.6, (k) => {
+    const e = ease.inOut(k);
+    item.g.position.lerpVectors(from, target(), e);
+    item.g.position.y += Math.sin(Math.PI * k) * 1.6;
+    item.g.rotation.y = rot0 + k * Math.PI * 2;
+    item.baseScale = lerp(1.2, onDino ? 0.85 : 1, e);
+  }, () => {
+    if (onDino) {
+      onDino.hatAnchor.add(item.g);
+      item.g.position.set(0, 0, 0);
+      item.g.rotation.set(0, 0, (onDino.index - 1) * 0.25 + 0.15);
+      onDino.squashS.kick(-2);
+      onDino.hat = item;
+      playAction(onDino, 'giggle');
+    } else {
+      item.g.rotation.y = rand(-0.4, 0.4);
+    }
+    item.spring.kick(-4);
+    Sound.play('place');
+    ring(item.g.getWorldPosition(V()).setY(BLANKET.top + 0.02), colors[0], 0.9, 0.8);
+  });
+  G.decorCount++;
+  afterDecor();
+}
+function afterDecor() {
+  if (G.decorCount >= 3) showButton(danceBtn);
+}
+
+function clearDecor() {
+  for (const kind of TRAY_KINDS) {
+    for (const it of G.decor[kind]) {
+      const i = tapTargets.indexOf(it.g);
+      if (i >= 0) tapTargets.splice(i, 1);
+      const b0 = it.baseScale;
+      tween(0.3, (k) => { it.pop = Math.max(0.001, 1 - k); it.baseScale = b0; }, () => it.g.removeFromParent());
+    }
+    G.decor[kind] = [];
+  }
+  for (const d of dinos) d.hat = null;
+}
+function clearTray() {
+  for (const it of G.tray) tween(0.3, (k) => { it.pop = Math.max(0.001, 1 - k); }, () => it.g.removeFromParent());
+  G.tray = [];
+}
+
+/* ---------- dance & replay ---------- */
+let confettiT = 0, noteBeat = -1;
+function startDance() {
+  if (G.phase !== 'decorate') return;
+  hideHint();
+  hideButton(danceBtn);
+  clearTray();
+  G.phase = 'dance';
+  G.danceT = 0;
+  noteBeat = -1;
+  for (const d of dinos) { d.state = 'dance'; d.action = null; d.lookCam = true; }
+  Sound.music();
+}
+function updateDance(dt) {
+  G.danceT += dt;
+  const b = G.danceT * BPM / 60;
+  confettiT -= dt;
+  if (confettiT < 0 && b < DANCE_BEATS) {
+    confettiT = REDUCED ? 0.35 : 0.12;
+    const m = new THREE.Mesh(geo('confetti', () => new THREE.BoxGeometry(0.16, 0.03, 0.09)), clay(pick(PASTELS), { noBump: true }));
+    m.position.set(rand(-6, 6), 7.5, rand(-3, 3.5));
+    m.rotation.set(rand(0, 3), rand(0, 3), rand(0, 3));
+    spawn(m, { vel: V(0, -rand(0.9, 1.3), 0), sway: 0.8, spin: V(rand(-3, 3), rand(-3, 3), rand(-3, 3)), life: 8, ground: BLANKET.top + 0.02, popIn: 0.1, fadeAt: 0.8 });
+  }
+  const beat = Math.floor(b);
+  if (beat !== noteBeat && b < DANCE_BEATS) {
+    noteBeat = beat;
+    const d = dinos[beat % 3];
+    const m = new THREE.Mesh(noteGeo(), clay(pick(PASTELS)));
+    m.position.copy(d.headWorld()).add(V(rand(-0.5, 0.5), 0.9, 0.2));
+    m.scale.setScalar(0.7);
+    spawn(m, { vel: V(rand(-0.3, 0.3), 1.0, 0), sway: 0.6, life: 2, popIn: 0.25, spin: V(0, 0, rand(-0.5, 0.5)) });
+  }
+  if (G.danceT > DANCE_LEN + 0.9) {
+    G.phase = 'end';
+    for (const d of dinos) {
+      d.state = 'sit';
+      playAction(d, 'giggle');
+      burstHearts(d.headWorld().add(V(0, 0.6, 0)), 4, 0.3);
+    }
+    wait(1.4, () => { showButton(replayBtn); G.lastAction = T; });
+  }
+}
+
+function replay() {
+  if (G.phase !== 'end') return;
+  hideHint();
+  hideButton(replayBtn);
+  Sound.play('pop');
+  G.round++;
+  G.phase = 'reset';
+  clearDecor();
+  for (const d of dinos) { d.state = 'idle'; d.squashS.kick(3); }
+  wait(0.25, () => { dressDinos(true); Sound.play('sparkle'); });
+  wait(1.0, () => {
+    for (const d of dinos) playAction(d, 'wave');
+    startRound();
+  });
+}
+
+/* =====================================================================
+   Screen-space helpers & hit testing (generous for small fingers)
+   ===================================================================== */
+let W = 1, H = 1;
+const _p = V();
+function toScreen(v) {
+  _p.copy(v).project(camera);
+  return { x: (_p.x + 1) / 2 * W, y: (1 - _p.y) / 2 * H };
+}
+const camRight = V();
+function worldToPx(v, r) {
+  const a = toScreen(v);
+  camRight.setFromMatrixColumn(camera.matrixWorld, 0);
+  const b = toScreen(tmpV.copy(v).addScaledVector(camRight, r));
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+function hitFruit(x, y) {
+  let best = null, bestScore = Infinity;
+  for (const f of G.fruits) {
+    if (f.state !== 'home' && f.state !== 'selected') continue;
+    const s = toScreen(f.g.position);
+    const r = worldToPx(f.g.position, G.fruitSize * 0.5);
+    const dd = Math.hypot(s.x - x, s.y - y);
+    if (dd < r * 1.3 + 14 && dd / r < bestScore) { best = f; bestScore = dd / r; }
+  }
+  return best;
+}
+function dinoRatio(d, x, y) {
+  const b = d.bodyWorld();
+  const R = worldToPx(b, 1.35);
+  const h = toScreen(d.headWorld()), s = toScreen(b);
+  return Math.min(Math.hypot(h.x - x, h.y - y), Math.hypot(s.x - x, s.y - y)) / R;
+}
+// the active (hungry) dino gets an extra-large target
+function targetDino(x, y) {
+  if (G.active && dinoRatio(G.active, x, y) < 1.6) return G.active;
+  let best = null, br = 1.25;
+  for (const d of dinos) {
+    const r = dinoRatio(d, x, y);
+    if (r < br) { best = d; br = r; }
+  }
+  return best;
+}
+function hitTray(x, y) {
+  let best = null, bd = Infinity;
+  for (const it of G.tray) {
+    if (it.pop < 0.5) continue;
+    const c = it.g.position.clone().add(V(0, 0.45, 0));
+    const s = toScreen(c);
+    const r = worldToPx(c, 0.8);
+    const dd = Math.hypot(s.x - x, s.y - y);
+    if (dd < r + 14 && dd < bd) { best = it; bd = dd; }
+  }
+  return best;
+}
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+function tapScenery(x, y) {
+  ndc.set(x / W * 2 - 1, -(y / H) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(tapTargets, true);
+  for (const h of hits) {
+    let o = h.object;
+    while (o && !o.userData.onTap) o = o.parent;
+    if (o) { o.userData.onTap(); return true; }
+  }
+  return false;
+}
+function pokeDino(d) {
+  G.lastAction = T;
+  d.squashS.kick(3);
+  if (G.phase === 'dance') { burstHearts(d.headWorld().add(V(0, 0.5, 0)), 2, 0.24); Sound.play('giggle'); return; }
+  if (d.action) return;
+  if (d === G.active) bubble.wiggle();
+  playAction(d, 'giggle');
+  burstHearts(d.headWorld().add(V(0, 0.5, 0)), 2, 0.22);
+}
+
+/* =====================================================================
+   Input: drag OR tap-then-tap, mouse & touch via Pointer Events
+   ===================================================================== */
+const ptr = { id: null, x0: 0, y0: 0, x: 0, y: 0, fruit: null, dragging: false, type: 'mouse' };
+const dragPlane = new THREE.Plane();
+function dragLift() { return ptr.type === 'mouse' ? 0 : Math.min(70, H * 0.075); }
+
+function setDragTarget(f) {
+  const fx = ptr.x, fy = ptr.y - dragLift();
+  ndc.set(fx / W * 2 - 1, -(fy / H) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+  const n = camera.getWorldDirection(V()).negate();
+  dragPlane.setFromNormalAndCoplanarPoint(n, V(0, 1.6, 1.6));
+  const hit = V();
+  if (!raycaster.ray.intersectPlane(dragPlane, hit)) return;
+  // magnet: pull the snack toward a nearby mouth
+  const d = targetDino(fx, fy);
+  for (const o of dinos) if (o !== d) o.anticipate = damp(o.anticipate, 0, 10, 1 / 60);
+  for (const o of dinos) { o.lookCam = false; o.lookAt.copy(f.g.position); }
+  if (d && !d.action) {
+    const r = dinoRatio(d, fx, fy);
+    const m = clamp(1 - r / 1.6, 0, 1);
+    hit.lerp(d.mouthWorld(), m * 0.55);
+    d.anticipate = Math.max(d.anticipate, clamp(m * 1.6, 0, 1));
+  }
+  f.dragTarget.copy(hit);
+}
+function endLook() { for (const d of dinos) { d.lookCam = true; d.anticipate = d.state === 'want' ? 0 : d.anticipate; } }
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (G.phase === 'start' || ptr.id !== null) return;
+  e.preventDefault();
+  Object.assign(ptr, { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, fruit: null, dragging: false, type: e.pointerType });
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  G.lastAction = T;
+  if (G.phase === 'feed') {
+    const f = hitFruit(e.clientX, e.clientY);
+    if (f) { ptr.fruit = f; hideHint(); f.spring.kick(2); }
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== ptr.id) return;
+  ptr.x = e.clientX; ptr.y = e.clientY;
+  const f = ptr.fruit;
+  if (f && !ptr.dragging && Math.hypot(ptr.x - ptr.x0, ptr.y - ptr.y0) > 12 && (f.state === 'home' || f.state === 'selected')) {
+    ptr.dragging = true;
+    if (G.selected && G.selected !== f) G.selected.state = 'home';
+    G.selected = null;
+    f.state = 'drag';
+    Sound.play('pick');
+  }
+  if (ptr.dragging && f.state === 'drag') setDragTarget(f);
+});
+function finishPointer(e, cancelled) {
+  if (e.pointerId !== ptr.id) return;
+  ptr.x = e.clientX; ptr.y = e.clientY;
+  const f = ptr.fruit;
+  if (ptr.dragging && f && f.state === 'drag') {
+    const d = cancelled ? null : targetDino(ptr.x, ptr.y - dragLift());
+    endLook();
+    if (d) deliver(f, d);
+    else { for (const o of dinos) o.anticipate = 0; returnHome(f); }
+  } else if (!cancelled) {
+    handleTap(ptr.x, ptr.y);
+  }
+  ptr.id = null; ptr.fruit = null; ptr.dragging = false;
+}
+canvas.addEventListener('pointerup', (e) => finishPointer(e, false));
+canvas.addEventListener('pointercancel', (e) => finishPointer(e, true));
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
+function handleTap(x, y) {
+  G.lastAction = T;
+  if (G.phase === 'feed') {
+    const f = hitFruit(x, y);
+    if (f) {
+      hideHint();
+      if (G.selected === f) deselect(); else select(f);
+      return;
+    }
+    const d = targetDino(x, y);
+    if (d && G.selected) {
+      const s = G.selected;
+      G.selected = null;
+      deliver(s, d);
+      return;
+    }
+    if (d) { pokeDino(d); return; }
+  }
+  if (G.phase === 'decorate') {
+    const it = hitTray(x, y);
+    if (it) { placeDecor(it); return; }
+  }
+  if (tapScenery(x, y)) return;
+  let best = null, br = 0.9;
+  for (const d of dinos) { const r = dinoRatio(d, x, y); if (r < br) { best = d; br = r; } }
+  if (best) pokeDino(best);
+}
+
+/* =====================================================================
+   HTML overlay: buttons, tutorial hand
+   ===================================================================== */
+const muteBtn = document.getElementById('mute');
+const danceBtn = document.getElementById('dance');
+const replayBtn = document.getElementById('replay');
+const startEl = document.getElementById('start');
+const handEl = document.getElementById('hand');
+
+function refreshMute() {
+  document.getElementById('icon-sound').style.display = Sound.muted ? 'none' : '';
+  document.getElementById('icon-muted').style.display = Sound.muted ? '' : 'none';
+}
+refreshMute();
+muteBtn.addEventListener('click', () => {
+  Sound.init();
+  Sound.setMuted(!Sound.muted);
+  refreshMute();
+  if (!Sound.muted) Sound.play('pop');
+});
+function showButton(b) {
+  if (!b.hidden) return;
+  b.hidden = false;
+  b.classList.remove('pop');
+  void b.offsetWidth;
+  b.classList.add('pop');
+  Sound.play('pop');
+}
+function hideButton(b) { b.hidden = true; b.classList.remove('pop'); }
+danceBtn.addEventListener('click', () => { Sound.play('tap'); startDance(); });
+replayBtn.addEventListener('click', replay);
+
+document.getElementById('play').addEventListener('click', () => {
+  Sound.init();
+  Sound.play('pop');
+  startEl.classList.add('gone');
+  for (const d of dinos) playAction(d, 'wave');
+  wait(0.5, () => { startEl.style.display = 'none'; startRound(); });
+  G.phase = 'intro';
+});
+
+/* ---------- visual tutorial hand ---------- */
+const hint = { mode: null, t: 0, ghost: null, fruit: null, dino: null, target: null, loops: 0 };
+function makeGhost(f) {
+  const gh = f.kind.build();
+  gh.traverse((m) => {
+    if (m.material) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0.55; m.castShadow = false; }
+  });
+  world.add(gh);
+  return gh;
+}
+function showDragHint() {
+  if (G.phase !== 'feed' || !G.active || ptr.dragging) return;
+  const di = dinos.indexOf(G.active);
+  const f = G.fruits.find((fr) => fr.kind.id === G.wants[di] && fr.state === 'home');
+  if (!f) return;
+  hideHint();
+  Object.assign(hint, { mode: 'drag', t: 0, fruit: f, dino: G.active, loops: 0, ghost: makeGhost(f) });
+  G.hintsShown++;
+}
+function showTapHint(targetFn) {
+  hideHint();
+  Object.assign(hint, { mode: 'tap', t: 0, target: targetFn, loops: 0 });
+  G.hintsShown++;
+}
+function hideHint() {
+  if (hint.ghost) hint.ghost.removeFromParent();
+  hint.ghost = null;
+  hint.mode = null;
+  handEl.style.opacity = 0;
+}
+function placeHand(x, y, s, o) {
+  handEl.style.transform = `translate(${x - 31}px, ${y - 7}px) scale(${s})`;
+  handEl.style.opacity = o;
+}
+function updateHint(dt) {
+  if (!hint.mode) return;
+  hint.t += dt;
+  if (hint.mode === 'drag') {
+    const L = 3.4;
+    if (hint.t > L) { hint.t -= L; hint.loops++; }
+    const f = hint.fruit, d = hint.dino;
+    if (G.active !== d || !G.fruits.includes(f) || f.state !== 'home' || hint.loops >= 3) { hideHint(); return; }
+    const t = hint.t;
+    const a = f.home.clone().add(V(0, 0.3, 0)), b = d.mouthWorld();
+    let k = 0, press = 1, op = 1;
+    if (t < 0.4) { op = t / 0.4; }
+    else if (t < 0.7) { press = 1 - 0.15 * Math.sin(Math.PI * (t - 0.4) / 0.3 * 0.5); }
+    else if (t < 2.1) { k = ease.inOut((t - 0.7) / 1.4); press = 0.88; }
+    else if (t < 2.6) { k = 1; press = 0.88 + 0.12 * ((t - 2.1) / 0.5); }
+    else { k = 1; op = Math.max(0, 1 - (t - 2.6) / 0.4); }
+    const p = a.clone().lerp(b, k);
+    p.y += Math.sin(Math.PI * k) * 0.8;
+    hint.ghost.position.copy(p);
+    const gs = G.fruitSize * (t < 0.7 ? 1 : 1.15) * (op > 0.01 ? 1 : 0.001);
+    hint.ghost.scale.setScalar(Math.max(0.001, gs));
+    hint.ghost.traverse((m) => { if (m.material) m.material.opacity = 0.55 * op; });
+    const s = toScreen(p);
+    placeHand(s.x, s.y + 40, press, op);
+  } else if (hint.mode === 'tap') {
+    const L = 2.0;
+    if (hint.t > L) { hint.t -= L; hint.loops++; }
+    if (hint.loops >= 3) { hideHint(); return; }
+    const s = hint.target();
+    if (!s) { hideHint(); return; }
+    const t = hint.t;
+    const op = t < 0.3 ? t / 0.3 : t > 1.7 ? (2 - t) / 0.3 : 1;
+    const tapPhase = (t - 0.5) / 0.35;
+    const press = t > 0.5 && t < 1.2 ? 1 - 0.14 * Math.abs(Math.sin(Math.PI * tapPhase)) : 1;
+    placeHand(s.x, s.y, press, op);
+  }
+}
+function updateIdleHints() {
+  if (hint.mode || ptr.id !== null) return;
+  const idle = T - G.lastAction;
+  if (G.phase === 'feed' && G.active && !G.selected && idle > 10) { G.lastAction = T; showDragHint(); }
+  else if (G.phase === 'decorate') {
+    if (G.decorCount < 3 && idle > 9) { G.lastAction = T; const i = Math.floor(rand(0, 3)); showTapHint(() => G.tray[i] ? toScreen(trayPos(i).add(V(0, 0.5, 0))) : null); }
+    else if (G.decorCount >= 3 && idle > 6) { G.lastAction = T; showTapHint(() => btnCenter(danceBtn)); }
+  } else if (G.phase === 'end' && !replayBtn.hidden && idle > 6) { G.lastAction = T; showTapHint(() => btnCenter(replayBtn)); }
+}
+function btnCenter(b) {
+  if (b.hidden) return null;
+  const r = b.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+/* =====================================================================
+   Layout: fixed camera fitted to the screen shape
+   ===================================================================== */
+function layout() {
+  W = window.innerWidth; H = window.innerHeight;
+  renderer.setSize(W, H);
+  camera.aspect = W / H;
+  G.portrait = W / H < 0.9;
+  G.fruitSize = G.portrait ? 1.2 : 1.05;
+  G.bubbleScale = G.portrait ? 1.25 : 1;
+  camera.fov = G.portrait ? 40 : 34;
+  camera.updateProjectionMatrix();
+  // must-see points: island sides, basket, bubbles and a bit of the floating underside
+  const need = G.portrait
+    ? [V(-4.75, 0, 1.6), V(4.75, 0, 1.6), V(0, -0.2, 5.0), V(-3.2, 1.8, 3.8), V(3.2, 1.8, 3.8), V(0, 5.9, -0.8), V(-2.4, 5.5, 0.1), V(3.4, 5.5, 0.1), V(0, -8, 0.5)]
+    : [V(-6.3, 0, 0.5), V(6.3, 0, 0.5), V(0, -0.2, 5.0), V(0, 5.6, -0.8), V(-2.4, 5.2, 0.1), V(3.4, 5.2, 0.1), V(0, -4.6, 3.3)];
+  const dir = V(0, 0.56, 1).normalize();
+  const up = V(0, 1, 0).applyAxisAngle(V(1, 0, 0), -Math.atan2(dir.y, dir.z));
+  const target = V(0, 1.2, 0.9);
+  const yTop = 0.86, yBot = -0.94;
+  const place = (dist) => {
+    camera.position.copy(target).addScaledVector(dir, dist);
+    camera.lookAt(target);
+    camera.updateMatrixWorld();
+  };
+  let dist = 20;
+  for (let pass = 0; pass < 4; pass++) {
+    let lo = 4, hi = 120;
+    for (let it = 0; it < 30; it++) {
+      const mid = (lo + hi) / 2;
+      place(mid);
+      let ymin = Infinity, ymax = -Infinity, ok = true;
+      for (const p of need) {
+        const q = p.clone().project(camera);
+        if (Math.abs(q.x) > 0.96 || q.z > 1) ok = false;
+        ymin = Math.min(ymin, q.y); ymax = Math.max(ymax, q.y);
+      }
+      if (ok && ymax - ymin <= yTop - yBot) hi = mid; else lo = mid;
+    }
+    dist = hi;
+    place(dist);
+    // re-centre the content vertically between the margins
+    let ymin = Infinity, ymax = -Infinity;
+    for (const p of need) { const q = p.clone().project(camera); ymin = Math.min(ymin, q.y); ymax = Math.max(ymax, q.y); }
+    const shift = ((ymin + ymax) / 2 - (yTop + yBot) / 2) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist;
+    target.addScaledVector(up, shift);
+  }
+  place(dist);
+  for (const f of G.fruits) layoutFruit(f);
+}
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', () => setTimeout(layout, 200));
+layout();
+
+/* =====================================================================
+   Main loop
+   ===================================================================== */
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(MAX_DT, Math.max(0, (now - last) / 1000));
+  last = now;
+  T += dt;
+
+  updateTweens(dt);
+  for (const d of dinos) updateDino(d, dt);
+  updateFruits(dt);
+  updateTray(dt);
+  if (G.phase === 'dance') updateDance(dt);
+  updateParts(dt);
+  pond.update(dt);
+  bubble.update(dt);
+
+  for (const tr of trees) {
+    tr.spring.update(dt); tr.squish.update(dt);
+    tr.sway.rotation.z = 0.025 * Math.sin(T * 0.8 + tr.phase) * AMBIENT + tr.spring.x * 0.12;
+    tr.sway.rotation.x = 0.015 * Math.sin(T * 0.6 + tr.phase) * AMBIENT;
+    const q = tr.squish.x * 0.05;
+    tr.canopy.scale.set(1 + q, 1 - q, 1 + q);
+  }
+  for (const r of rocks) {
+    r.spring.update(dt);
+    const j = 0.025 * Math.sin(T * 2.6 + r.phase) * AMBIENT + r.spring.x * 0.06;
+    r.inner.scale.set(r.s * (1 + j * 0.6), r.s * (1 - j), r.s * (1 + j * 0.6));
+  }
+  for (const c of clouds) c.g.position.x = c.x + Math.sin(T * c.sp + c.ph) * 0.8 * AMBIENT;
+
+  updateHint(dt);
+  updateIdleHints();
+
+  renderer.clear();
+  renderer.render(scene, camera);
+  renderer.clearDepth();
+  renderer.render(overlay, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* =====================================================================
+   Tiny inspection hook (used by the automated checks in tests/)
+   ===================================================================== */
+window.dinoGame = {
+  info() {
+    return {
+      phase: G.phase,
+      round: G.round,
+      fedCount: G.fedCount,
+      wants: G.wants.slice(),
+      active: G.active ? dinos.indexOf(G.active) : -1,
+      want: G.active ? G.wants[dinos.indexOf(G.active)] : null,
+      selected: G.selected ? G.selected.kind.id : null,
+      fruits: G.fruits.map((f) => ({ kind: f.kind.id, state: f.state, ...toScreen(f.g.position) })),
+      dinos: dinos.map((d) => ({ state: d.state, fed: d.fed, busy: !!d.action, action: d.action ? d.action.name : null, accs: d.accNames.slice(), hat: !!d.hat, ...toScreen(d.headWorld()) })),
+      tray: G.tray.map((it) => ({ kind: it.kind, pop: it.pop, ...toScreen(it.g.position.clone().add(V(0, 0.45, 0))) })),
+      decor: Object.fromEntries(TRAY_KINDS.map((k) => [k, G.decor[k].length])),
+      decorCount: G.decorCount,
+      particles: parts.length,
+      pond: toScreen(pond.P.clone().add(V(0, 0.05, 0))),
+      tree: toScreen(trees[0].canopy.getWorldPosition(V())),
+      hint: hint.mode,
+      buttons: { dance: !danceBtn.hidden, replay: !replayBtn.hidden },
+    };
+  },
+};
+</script>
+</body>
+</html>
